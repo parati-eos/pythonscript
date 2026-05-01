@@ -6,29 +6,23 @@ Run:
 """
 
 import json
-import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import List
+from typing import Annotated, List
 
 try:
     import fitz
 except ImportError:
     fitz = None
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
-from remove_footer import (
-    cover_footer,
-    cover_header_logo,
-    detect_footer_height,
-)
+from remove_footer import cover_footer, cover_header_logo, detect_footer_height
 
 app = FastAPI(title="PDF Cleaner")
 
-# Processed files live here for the lifetime of the server process
 _OUTPUT_DIR = Path(tempfile.mkdtemp(prefix="pdf_cleaner_"))
 
 
@@ -42,6 +36,11 @@ def _process_pdf(src: Path, dst: Path) -> None:
     doc.close()
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok", "pymupdf": fitz is not None}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     html_path = Path(__file__).parent / "templates" / "index.html"
@@ -49,7 +48,7 @@ async def index():
 
 
 @app.post("/process")
-async def process_files(files: List[UploadFile] = File(...)):
+async def process_files(files: Annotated[List[UploadFile], File()]):
     if fitz is None:
         raise HTTPException(500, "PyMuPDF is not installed")
 
