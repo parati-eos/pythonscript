@@ -20,8 +20,10 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from remove_footer import cover_footer, cover_header_logo, detect_footer_height
+from smartleads_clay import router as smartleads_router
 
 app = FastAPI(title="PDF Cleaner")
+app.include_router(smartleads_router)
 
 _OUTPUT_DIR = Path(tempfile.mkdtemp(prefix="pdf_cleaner_"))
 
