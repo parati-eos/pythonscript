@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PDF Cleaner</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -22,24 +23,14 @@
       border-radius: 14px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.10);
       width: 100%;
-      max-width: 640px;
+      max-width: 680px;
       padding: 36px 32px;
     }
 
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #1a1a2e;
-      margin-bottom: 4px;
-    }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+    .subtitle { font-size: 0.875rem; color: #6b7280; margin-bottom: 28px; }
 
-    .subtitle {
-      font-size: 0.875rem;
-      color: #6b7280;
-      margin-bottom: 28px;
-    }
-
-    /* Drop zone */
+    /* ── Drop zone ── */
     .drop-zone {
       border: 2px dashed #c4c9d4;
       border-radius: 10px;
@@ -49,160 +40,172 @@
       transition: border-color 0.2s, background 0.2s;
       background: #fafbfc;
     }
-
-    .drop-zone.drag-over {
-      border-color: #4f46e5;
-      background: #eef2ff;
-    }
-
-    .drop-zone svg {
-      margin-bottom: 12px;
-      color: #9ca3af;
-    }
-
-    .drop-zone p {
-      font-size: 0.9rem;
-      color: #6b7280;
-    }
-
-    .drop-zone span {
-      color: #4f46e5;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .drop-zone .hint {
-      font-size: 0.78rem;
-      color: #9ca3af;
-      margin-top: 6px;
-    }
-
+    .drop-zone.drag-over { border-color: #4f46e5; background: #eef2ff; }
+    .drop-zone svg { margin-bottom: 12px; color: #9ca3af; }
+    .drop-zone p { font-size: 0.9rem; color: #6b7280; }
+    .drop-zone span { color: #4f46e5; font-weight: 600; cursor: pointer; }
+    .drop-zone .hint { font-size: 0.78rem; color: #9ca3af; margin-top: 6px; }
     #file-input { display: none; }
 
-    /* Selected files chips */
-    #selected-list {
-      margin-top: 16px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+    /* ── File chips ── */
+    #selected-list { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      background: #eef2ff; color: #3730a3;
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 0.8rem; font-weight: 500;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .chip button {
+      background: none; border: none; cursor: pointer;
+      color: #6366f1; font-size: 1rem; line-height: 1; padding: 0;
     }
 
-    .chip {
-      background: #eef2ff;
-      color: #3730a3;
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-size: 0.8rem;
-      font-weight: 500;
+    /* ── Footer height control ── */
+    #height-section {
+      display: none;
+      margin-top: 20px;
+      padding: 14px 16px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+    .height-row {
       display: flex;
       align-items: center;
-      gap: 6px;
-    }
-
-    .chip button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: #6366f1;
-      font-size: 1rem;
-      line-height: 1;
-      padding: 0;
-    }
-
-    /* Process button */
-    #process-btn {
-      margin-top: 24px;
-      width: 100%;
-      padding: 12px;
-      background: #4f46e5;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s, opacity 0.2s;
-    }
-
-    #process-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    #process-btn:not(:disabled):hover {
-      background: #4338ca;
-    }
-
-    /* Results */
-    #results {
-      margin-top: 28px;
-      display: flex;
-      flex-direction: column;
+      flex-wrap: wrap;
       gap: 10px;
     }
+    .height-row label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #374151;
+      white-space: nowrap;
+    }
+    .height-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .h-btn {
+      width: 30px; height: 30px;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      background: #fff; cursor: pointer;
+      font-size: 1.1rem; font-weight: 700; color: #374151;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .h-btn:hover { background: #f3f4f6; }
+    #footer-height {
+      width: 72px; padding: 6px 8px;
+      border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 0.875rem; text-align: center;
+      -moz-appearance: textfield;
+    }
+    #footer-height::-webkit-outer-spin-button,
+    #footer-height::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    #footer-height:focus { outline: none; border-color: #4f46e5; }
+    #btn-detect {
+      padding: 6px 12px;
+      border: 1px solid #4f46e5; border-radius: 6px;
+      background: #fff; color: #4f46e5;
+      font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    #btn-detect:hover { background: #eef2ff; }
+    #btn-detect:disabled { opacity: 0.5; cursor: not-allowed; }
+    #height-hint {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: #9ca3af;
+    }
 
-    .result-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      background: #f9fafb;
+    /* ── PDF Preview ── */
+    #preview-section { display: none; margin-top: 16px; }
+    .preview-label {
+      font-size: 0.75rem; font-weight: 700;
+      color: #9ca3af; text-transform: uppercase;
+      letter-spacing: 0.06em; margin-bottom: 8px;
+    }
+    #preview-wrap {
+      position: relative;
       border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #e5e7eb;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    #pdf-canvas { display: block; width: 100%; height: auto; }
+
+    #cut-line {
+      position: absolute; left: 0; width: 100%;
+      height: 2px; background: #ef4444;
+      display: none; z-index: 2; pointer-events: none;
+    }
+    #cut-label {
+      position: absolute; right: 8px;
+      background: #ef4444; color: #fff;
+      font-size: 0.68rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 4px;
+      white-space: nowrap; pointer-events: none;
+      transform: translateY(-100%);
+      margin-top: -2px;
+    }
+    #cut-overlay {
+      position: absolute; left: 0; width: 100%;
+      background: rgba(239,68,68,0.13);
+      display: none; z-index: 1; pointer-events: none;
+    }
+    #preview-loading {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #f3f4f6;
+      font-size: 0.85rem; color: #9ca3af;
+    }
+
+    /* ── Process button ── */
+    #process-btn {
+      margin-top: 24px; width: 100%; padding: 12px;
+      background: #4f46e5; color: #fff;
+      border: none; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; transition: background 0.2s, opacity 0.2s;
+    }
+    #process-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #process-btn:not(:disabled):hover { background: #4338ca; }
+
+    /* ── Results ── */
+    #results { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+    .result-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 8px;
+      background: #f9fafb; border: 1px solid #e5e7eb;
       font-size: 0.875rem;
     }
-
     .result-row .filename {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: #374151;
-      font-weight: 500;
+      flex: 1; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+      color: #374151; font-weight: 500;
     }
-
     .badge {
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      white-space: nowrap;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 0.78rem; font-weight: 600; white-space: nowrap;
     }
-
     .badge.processing { background: #fef3c7; color: #b45309; }
     .badge.done       { background: #d1fae5; color: #065f46; }
     .badge.error      { background: #fee2e2; color: #991b1b; }
-
     .download-btn {
-      padding: 5px 14px;
-      background: #4f46e5;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
-      white-space: nowrap;
-      transition: background 0.2s;
+      padding: 5px 14px; background: #4f46e5; color: #fff;
+      border: none; border-radius: 6px;
+      font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      white-space: nowrap; transition: background 0.2s;
     }
-
     .download-btn:hover { background: #4338ca; }
-
-    /* spinner */
     .spinner {
       width: 16px; height: 16px;
-      border: 2px solid #d1d5db;
-      border-top-color: #b45309;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      border: 2px solid #d1d5db; border-top-color: #b45309;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
       flex-shrink: 0;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
-
     .icon { flex-shrink: 0; font-size: 1.1rem; }
-
     .error-msg { font-size: 0.75rem; color: #ef4444; margin-top: 2px; }
   </style>
 </head>
@@ -223,27 +226,70 @@
 
   <div id="selected-list"></div>
 
-  <button id="process-btn" disabled>Process PDFs</button>
+  <!-- Footer height control (shown after file selected) -->
+  <div id="height-section">
+    <div class="height-row">
+      <label for="footer-height">Footer height (pts)</label>
+      <div class="height-controls">
+        <button class="h-btn" id="btn-minus" type="button">&#8722;</button>
+        <input type="number" id="footer-height" min="0" max="600" placeholder="Auto" />
+        <button class="h-btn" id="btn-plus" type="button">&#43;</button>
+        <button id="btn-detect" type="button">Auto-detect</button>
+      </div>
+    </div>
+    <p id="height-hint">Leave empty to auto-detect. Red line shows where the footer will be cut.</p>
+  </div>
 
+  <!-- PDF preview (shown after file selected) -->
+  <div id="preview-section">
+    <p class="preview-label">Preview — page 1</p>
+    <div id="preview-wrap">
+      <div id="preview-loading">Loading preview…</div>
+      <canvas id="pdf-canvas"></canvas>
+      <div id="cut-line"><span id="cut-label"></span></div>
+      <div id="cut-overlay"></div>
+    </div>
+  </div>
+
+  <button id="process-btn" disabled>Process PDFs</button>
   <div id="results"></div>
 </div>
 
 <script>
-  const dropZone    = document.getElementById('drop-zone');
-  const fileInput   = document.getElementById('file-input');
-  const browseLink  = document.getElementById('browse-link');
-  const selectedList = document.getElementById('selected-list');
-  const processBtn  = document.getElementById('process-btn');
-  const results     = document.getElementById('results');
+  // ── PDF.js setup ──────────────────────────────────────────────────────────
+  const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_CDN + '/pdf.worker.min.js';
 
-  let selectedFiles = [];
+  // ── State ─────────────────────────────────────────────────────────────────
+  let selectedFiles   = [];
+  let previewPageH    = 0;   // PDF page height in points
+  let previewScale    = 1;   // pts → canvas px multiplier
 
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const dropZone      = document.getElementById('drop-zone');
+  const fileInput     = document.getElementById('file-input');
+  const browseLink    = document.getElementById('browse-link');
+  const selectedList  = document.getElementById('selected-list');
+  const processBtn    = document.getElementById('process-btn');
+  const results       = document.getElementById('results');
+  const heightSection = document.getElementById('height-section');
+  const previewSection= document.getElementById('preview-section');
+  const heightInput   = document.getElementById('footer-height');
+  const heightHint    = document.getElementById('height-hint');
+  const btnMinus      = document.getElementById('btn-minus');
+  const btnPlus       = document.getElementById('btn-plus');
+  const btnDetect     = document.getElementById('btn-detect');
+  const canvas        = document.getElementById('pdf-canvas');
+  const cutLine       = document.getElementById('cut-line');
+  const cutLabel      = document.getElementById('cut-label');
+  const cutOverlay    = document.getElementById('cut-overlay');
+  const previewLoading= document.getElementById('preview-loading');
+
+  // ── Drop zone events ──────────────────────────────────────────────────────
   browseLink.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('click', e => { if (e.target !== browseLink) fileInput.click(); });
-
   fileInput.addEventListener('change', () => addFiles(fileInput.files));
-
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
@@ -253,18 +299,19 @@
 
   function addFiles(fileList) {
     for (const f of fileList) {
-      if (f.type === 'application/pdf' && !selectedFiles.find(x => x.name === f.name && x.size === f.size)) {
+      if (f.type === 'application/pdf' && !selectedFiles.find(x => x.name === f.name && x.size === f.size))
         selectedFiles.push(f);
-      }
     }
     renderChips();
     processBtn.disabled = selectedFiles.length === 0;
+    refreshPreview();
   }
 
   function removeFile(idx) {
     selectedFiles.splice(idx, 1);
     renderChips();
     processBtn.disabled = selectedFiles.length === 0;
+    refreshPreview();
   }
 
   function renderChips() {
@@ -277,16 +324,127 @@
     });
   }
 
+  // ── Preview visibility ────────────────────────────────────────────────────
+  function refreshPreview() {
+    if (selectedFiles.length === 0) {
+      heightSection.style.display = 'none';
+      previewSection.style.display = 'none';
+      previewPageH = 0;
+      return;
+    }
+    heightSection.style.display = 'block';
+    previewSection.style.display = 'block';
+    renderPdfPreview(selectedFiles[0]);
+  }
+
+  // ── PDF.js render ─────────────────────────────────────────────────────────
+  async function renderPdfPreview(file) {
+    previewLoading.style.display = 'flex';
+    canvas.style.display = 'none';
+    hideCutLine();
+
+    try {
+      const buf  = await file.arrayBuffer();
+      const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
+      const page = await pdf.getPage(1);
+
+      const vp1  = page.getViewport({ scale: 1 });
+      previewPageH = vp1.height;
+
+      // Scale to fit container width
+      const containerW = document.getElementById('preview-wrap').clientWidth;
+      previewScale = containerW / vp1.width;
+      const vp   = page.getViewport({ scale: previewScale });
+
+      canvas.width  = vp.width;
+      canvas.height = vp.height;
+
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+      previewLoading.style.display = 'none';
+      canvas.style.display = 'block';
+      updateCutLine();
+    } catch (err) {
+      previewLoading.textContent = 'Could not render preview.';
+    }
+  }
+
+  // ── Cut line overlay ──────────────────────────────────────────────────────
+  function updateCutLine() {
+    if (!previewPageH) return;
+    const val = parseFloat(heightInput.value);
+    if (!val || val <= 0) { hideCutLine(); return; }
+
+    // Footer is from the bottom; cut Y from top = (pageHeight - footerHeight) * scale
+    const cutY = (previewPageH - val) * previewScale;
+    if (cutY < 0 || cutY > canvas.height) { hideCutLine(); return; }
+
+    cutLine.style.display  = 'block';
+    cutLine.style.top      = cutY + 'px';
+    cutLabel.textContent   = val + ' pts';
+    cutOverlay.style.display = 'block';
+    cutOverlay.style.top   = cutY + 'px';
+    cutOverlay.style.height = (canvas.height - cutY) + 'px';
+  }
+
+  function hideCutLine() {
+    cutLine.style.display   = 'none';
+    cutOverlay.style.display = 'none';
+  }
+
+  // ── Height input interactions ─────────────────────────────────────────────
+  heightInput.addEventListener('input', updateCutLine);
+
+  btnMinus.addEventListener('click', () => {
+    const v = parseInt(heightInput.value) || 0;
+    heightInput.value = Math.max(0, v - 1);
+    updateCutLine();
+  });
+
+  btnPlus.addEventListener('click', () => {
+    const v = parseInt(heightInput.value) || 0;
+    heightInput.value = v + 1;
+    updateCutLine();
+  });
+
+  btnDetect.addEventListener('click', async () => {
+    if (selectedFiles.length === 0) return;
+    btnDetect.disabled    = true;
+    btnDetect.textContent = 'Detecting…';
+    heightHint.textContent = 'Sending first page to server…';
+    try {
+      const form = new FormData();
+      form.append('file', selectedFiles[0]);
+      const resp = await fetch('/detect-height', { method: 'POST', body: form });
+      const data = await resp.json();
+      if (data.footer_height_pts !== undefined) {
+        const pts = Math.round(data.footer_height_pts);
+        heightInput.value = pts > 0 ? pts : '';
+        updateCutLine();
+        heightHint.textContent = pts > 0
+          ? `Auto-detected: ${pts} pts from the bottom of the page.`
+          : 'Auto-detect found no footer. Try entering a value manually.';
+      } else {
+        heightHint.textContent = 'Server returned an unexpected response.';
+      }
+    } catch {
+      heightHint.textContent = 'Auto-detect failed. Please enter a value manually.';
+    } finally {
+      btnDetect.disabled    = false;
+      btnDetect.textContent = 'Auto-detect';
+    }
+  });
+
+  // ── Process ───────────────────────────────────────────────────────────────
   processBtn.addEventListener('click', async () => {
     if (selectedFiles.length === 0) return;
 
     processBtn.disabled = true;
-    results.innerHTML = '';
+    results.innerHTML   = '';
 
-    // Pre-populate all rows as "queued"
     const rowMap = {};
     selectedFiles.forEach(f => {
-      const row = createRow(f.name, 'queued');
+      const row = createRow(f.name);
       results.appendChild(row.el);
       rowMap[f.name] = row;
     });
@@ -294,11 +452,14 @@
     const form = new FormData();
     selectedFiles.forEach(f => form.append('files', f));
 
+    const heightVal = parseInt(heightInput.value);
+    if (heightVal > 0) form.append('footer_height', heightVal);
+
     try {
       const resp = await fetch('/process', { method: 'POST', body: form });
       if (!resp.ok) throw new Error(`Server error ${resp.status}`);
 
-      const reader = resp.body.getReader();
+      const reader  = resp.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
 
@@ -307,44 +468,42 @@
         if (done) break;
         buf += decoder.decode(value, { stream: true });
         const lines = buf.split('\n');
-        buf = lines.pop(); // last partial line stays in buffer
+        buf = lines.pop();
         for (const line of lines) {
           if (!line.trim()) continue;
-          try {
-            const msg = JSON.parse(line);
-            updateRow(rowMap[msg.name], msg);
-          } catch (_) {}
+          try { updateRow(rowMap[JSON.parse(line).name], JSON.parse(line)); } catch (_) {}
         }
       }
     } catch (err) {
       const row = document.createElement('div');
-      row.className = 'result-row';
+      row.className   = 'result-row';
       row.style.color = '#ef4444';
       row.textContent = 'Upload failed: ' + err.message;
       results.appendChild(row);
     }
 
-    // Allow re-processing
     selectedFiles = [];
     renderChips();
     processBtn.disabled = true;
-    fileInput.value = '';
+    fileInput.value     = '';
+    heightSection.style.display  = 'none';
+    previewSection.style.display = 'none';
   });
 
-  function createRow(name, status) {
+  // ── Row helpers ───────────────────────────────────────────────────────────
+  function createRow(name) {
     const el = document.createElement('div');
     el.className = 'result-row';
     el.innerHTML = `
       <span class="icon">📄</span>
       <span class="filename" title="${name}">${name}</span>
-      <span class="badge processing">Queued</span>
-    `;
+      <span class="badge processing">Queued</span>`;
     return { el, name };
   }
 
   function updateRow(row, msg) {
     if (!row) return;
-    const badge = row.el.querySelector('.badge');
+    const badge   = row.el.querySelector('.badge');
     const spinner = row.el.querySelector('.spinner');
     if (spinner) spinner.remove();
 
@@ -352,22 +511,22 @@
       const sp = document.createElement('div');
       sp.className = 'spinner';
       row.el.insertBefore(sp, row.el.querySelector('.filename'));
-      badge.className = 'badge processing';
+      badge.className   = 'badge processing';
       badge.textContent = 'Processing…';
     } else if (msg.status === 'done') {
-      badge.className = 'badge done';
+      badge.className   = 'badge done';
       badge.textContent = 'Done ✓';
       const a = document.createElement('a');
-      a.className = 'download-btn';
-      a.href = msg.download_url;
-      a.download = '';
+      a.className   = 'download-btn';
+      a.href        = msg.download_url;
+      a.download    = '';
       a.textContent = 'Download';
       row.el.appendChild(a);
     } else if (msg.status === 'error') {
-      badge.className = 'badge error';
+      badge.className   = 'badge error';
       badge.textContent = 'Error';
       const em = document.createElement('div');
-      em.className = 'error-msg';
+      em.className   = 'error-msg';
       em.textContent = msg.error || 'Unknown error';
       row.el.appendChild(em);
     }
