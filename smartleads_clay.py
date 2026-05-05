@@ -103,11 +103,13 @@ def _write_to_sheet(event_type: str, deal_link: str) -> dict:
     if link_col is None:
         return {"status": "error", "detail": "Could not find 'LINK TO DEAL' column in the sheet"}
 
-    # Find the matching row (row 1 is headers, data starts at row 2)
+    # Find the matching row — try exact match first, then substring match
+    # (Smartleads may send a partial path while the sheet has the full URL)
+    dl_lower = deal_link.strip().lower()
     target_row: int | None = None
     for row_idx, row in enumerate(all_values[1:], start=2):
-        cell_val = row[link_col - 1] if len(row) >= link_col else ""
-        if cell_val.strip().lower() == deal_link.strip().lower():
+        cell_val = (row[link_col - 1] if len(row) >= link_col else "").strip().lower()
+        if cell_val == dl_lower or dl_lower in cell_val or cell_val in dl_lower:
             target_row = row_idx
             break
 
@@ -168,17 +170,20 @@ def _extract_event_and_deal_link(payload: Any) -> tuple[str, str]:
         or ""
     )
 
-    # Try flat fields first, then nested custom_variables
+    # Try every known key Smartleads might use for the deal link
     custom = payload.get("custom_variables") or {}
     deal_link = (
-        payload.get("link_to_deal")
+        payload.get("linktodeal")          # Smartleads custom field name
+        or payload.get("LINKTODEAL")
+        or payload.get("link_to_deal")
         or payload.get("deal_link")
         or payload.get("lead_url")
         or payload.get("website")
         or payload.get("url")
+        or custom.get("linktodeal")
+        or custom.get("LINKTODEAL")
         or custom.get("link_to_deal")
         or custom.get("deal_link")
-        or custom.get("website")
         or ""
     )
 
