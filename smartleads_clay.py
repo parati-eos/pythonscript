@@ -73,9 +73,9 @@ def _col_index(headers: list[str], *candidates: str) -> int | None:
     return None
 
 
-def _write_to_sheet(event_type: str, lead_email: str) -> dict:
+def _write_to_sheet(event_type: str, deal_link: str) -> dict:
     """
-    Find the row whose email matches `lead_email` and increment
+    Find the row whose LINK TO DEAL matches `deal_link` and increment
     the column that corresponds to `event_type`.
     This runs synchronously inside a thread-pool worker.
     """
@@ -88,24 +88,24 @@ def _write_to_sheet(event_type: str, lead_email: str) -> dict:
     headers = all_values[0]
 
     # Locate structural columns
-    email_col    = _col_index(headers, "email")
-    open_col     = _col_index(headers, "email_open")
-    reply_col    = _col_index(headers, "email_reply")
-    clicked_col  = _col_index(headers, "link_click", "link_clicked", "email_link")
+    link_col    = _col_index(headers, "link_to_deal", "link to deal", "linktodeal")
+    open_col    = _col_index(headers, "email_open")
+    reply_col   = _col_index(headers, "email_reply")
+    clicked_col = _col_index(headers, "link_click", "link_clicked", "email_link")
 
-    if email_col is None:
-        return {"status": "error", "detail": "Could not find an 'email' column in the sheet"}
+    if link_col is None:
+        return {"status": "error", "detail": "Could not find a 'LINK TO DEAL' column in the sheet"}
 
     # Find the matching row (row 1 is headers, data starts at row 2)
     target_row: int | None = None
     for row_idx, row in enumerate(all_values[1:], start=2):
-        cell_val = row[email_col - 1] if len(row) >= email_col else ""
-        if cell_val.strip().lower() == lead_email.strip().lower():
+        cell_val = row[link_col - 1] if len(row) >= link_col else ""
+        if cell_val.strip().lower() == deal_link.strip().lower():
             target_row = row_idx
             break
 
     if target_row is None:
-        return {"status": "not_found", "email": lead_email}
+        return {"status": "not_found", "deal_link": deal_link}
 
     # Map event type → column
     evt = event_type.lower()
@@ -135,7 +135,7 @@ def _write_to_sheet(event_type: str, lead_email: str) -> dict:
 
     return {
         "status": "updated",
-        "email": lead_email,
+        "deal_link": deal_link,
         "column": col_label,
         "new_value": new_val,
         "row": target_row,
@@ -144,9 +144,9 @@ def _write_to_sheet(event_type: str, lead_email: str) -> dict:
 
 # ── event extraction helpers ──────────────────────────────────────────────────
 
-def _extract_event_and_email(payload: Any) -> tuple[str, str]:
+def _extract_event_and_deal_link(payload: Any) -> tuple[str, str]:
     """
-    Pull event type and lead email out of whatever Smartleads sends.
+    Pull event type and LINK TO DEAL out of whatever Smartleads sends.
     Handles both flat and nested payload shapes.
     """
     if not isinstance(payload, dict):
@@ -160,17 +160,21 @@ def _extract_event_and_email(payload: Any) -> tuple[str, str]:
         or ""
     )
 
-    # Lead email — try common field names / nested objects
-    lead_email = (
-        payload.get("to")
-        or payload.get("lead_email")
-        or payload.get("email")
-        or (payload.get("lead") or {}).get("email")
-        or (payload.get("data") or {}).get("email")
+    # Deal link — try flat fields then nested custom_variables
+    custom = payload.get("custom_variables") or {}
+    deal_link = (
+        payload.get("link_to_deal")
+        or payload.get("deal_link")
+        or payload.get("lead_url")
+        or payload.get("website")
+        or payload.get("url")
+        or custom.get("link_to_deal")
+        or custom.get("deal_link")
+        or custom.get("website")
         or ""
     )
 
-    return str(event_type), str(lead_email)
+    return str(event_type), str(deal_link)
 
 
 # ── endpoints ─────────────────────────────────────────────────────────────────
@@ -188,22 +192,21 @@ async def receive_from_smartleads(request: Request):
         raw = await request.body()
         payload = raw.decode("utf-8", errors="replace")
 
-    event_type, lead_email = _extract_event_and_email(payload)
+    event_type, deal_link = _extract_event_and_deal_link(payload)
 
-    if not lead_email:
+    if not deal_link:
         return {
             "status": "skipped",
-            "reason": "could not identify lead email in payload",
+            "reason": "could not identify 'link_to_deal' in payload",
             "received": payload,
         }
 
-    # Run the synchronous gspread calls in a thread so we don't block the event loop
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
-        _executor, _write_to_sheet, event_type, lead_email
+        _executor, _write_to_sheet, event_type, deal_link
     )
 
-    return {"event_type": event_type, "lead_email": lead_email, **result}
+    return {"event_type": event_type, "deal_link": deal_link, **result}
 
 
 @router.get("/smartleads-inbound/health")
