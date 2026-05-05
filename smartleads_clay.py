@@ -86,11 +86,16 @@ def _fetch_linkedin_from_smartleads(lead_id: str) -> str:
             timeout=10,
         )
         resp.raise_for_status()
-        data = resp.json()
+        body = resp.json()
+        # Response shape: {"ok": true, "data": [{...lead...}]}
+        leads = body.get("data") or []
+        lead = leads[0] if leads else {}
+        custom = lead.get("custom_fields") or {}
         linkedin = (
-            data.get("linkedin_profile")
-            or data.get("linkedin")
-            or data.get("website")
+            lead.get("linkedin_profile")
+            or custom.get("LINK_TO_DEAL")
+            or custom.get("linktodeal")
+            or lead.get("website")
             or ""
         )
         log.warning("SMARTLEADS API — lead_id=%s  linkedin_profile='%s'", lead_id, linkedin)
