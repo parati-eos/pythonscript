@@ -22,6 +22,7 @@ Credentials:
 
 import asyncio
 import json
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -30,6 +31,8 @@ from typing import Any
 import gspread
 from fastapi import APIRouter, Request
 from google.oauth2.service_account import Credentials
+
+log = logging.getLogger("smartleads")
 
 router = APIRouter(prefix="/webhook", tags=["smartleads → sheets"])
 
@@ -192,9 +195,16 @@ async def receive_from_smartleads(request: Request):
         raw = await request.body()
         payload = raw.decode("utf-8", errors="replace")
 
+    log.warning("=== SMARTLEADS PAYLOAD RECEIVED ===")
+    log.warning("RAW PAYLOAD: %s", json.dumps(payload, indent=2) if isinstance(payload, dict) else payload)
+
     event_type, deal_link = _extract_event_and_deal_link(payload)
 
+    log.warning("EXTRACTED event_type='%s'  deal_link='%s'", event_type, deal_link)
+
     if not deal_link:
+        log.warning("SKIPPED — no link_to_deal found in payload keys: %s",
+                    list(payload.keys()) if isinstance(payload, dict) else "N/A")
         return {
             "status": "skipped",
             "reason": "could not identify 'link_to_deal' in payload",
@@ -206,6 +216,7 @@ async def receive_from_smartleads(request: Request):
         _executor, _write_to_sheet, event_type, deal_link
     )
 
+    log.warning("SHEET RESULT: %s", result)
     return {"event_type": event_type, "deal_link": deal_link, **result}
 
 
