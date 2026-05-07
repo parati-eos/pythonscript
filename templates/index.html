@@ -15,7 +15,7 @@
       display: flex;
       align-items: flex-start;
       justify-content: center;
-      padding: 40px 16px;
+      padding: 40px 16px 60px;
     }
 
     .card {
@@ -23,7 +23,7 @@
       border-radius: 14px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.10);
       width: 100%;
-      max-width: 680px;
+      max-width: 700px;
       padding: 36px 32px;
     }
 
@@ -34,129 +34,133 @@
     .drop-zone {
       border: 2px dashed #c4c9d4;
       border-radius: 10px;
-      padding: 40px 20px;
+      padding: 36px 20px;
       text-align: center;
       cursor: pointer;
       transition: border-color 0.2s, background 0.2s;
       background: #fafbfc;
     }
     .drop-zone.drag-over { border-color: #4f46e5; background: #eef2ff; }
-    .drop-zone svg { margin-bottom: 12px; color: #9ca3af; }
+    .drop-zone svg { margin-bottom: 10px; color: #9ca3af; }
     .drop-zone p { font-size: 0.9rem; color: #6b7280; }
-    .drop-zone span { color: #4f46e5; font-weight: 600; cursor: pointer; }
+    .drop-zone span { color: #4f46e5; font-weight: 600; }
     .drop-zone .hint { font-size: 0.78rem; color: #9ca3af; margin-top: 6px; }
     #file-input { display: none; }
 
-    /* ── File chips ── */
-    #selected-list { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
-    .chip {
-      background: #eef2ff; color: #3730a3;
-      border-radius: 20px; padding: 4px 12px;
-      font-size: 0.8rem; font-weight: 500;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .chip button {
-      background: none; border: none; cursor: pointer;
-      color: #6366f1; font-size: 1rem; line-height: 1; padding: 0;
+    /* ── PDF cards ── */
+    #cards-container { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
+
+    .pdf-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
     }
 
-    /* ── Footer height control ── */
-    #height-section {
-      display: none;
-      margin-top: 20px;
-      padding: 14px 16px;
+    .pdf-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
       background: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
+      border-bottom: 1px solid #e5e7eb;
     }
-    .height-row {
+    .card-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .card-name {
+      flex: 1;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #374151;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-remove {
+      background: none; border: none; cursor: pointer;
+      color: #9ca3af; font-size: 1.1rem; line-height: 1;
+      padding: 2px 4px; flex-shrink: 0;
+      transition: color 0.15s;
+    }
+    .card-remove:hover { color: #ef4444; }
+
+    .pdf-card-body { padding: 14px; }
+
+    /* ── Height controls (per card) ── */
+    .card-height-row {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
+      margin-bottom: 8px;
     }
-    .height-row label {
-      font-size: 0.875rem;
+    .card-height-row label {
+      font-size: 0.8rem;
       font-weight: 600;
       color: #374151;
       white-space: nowrap;
     }
-    .height-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .h-btn {
-      width: 30px; height: 30px;
+      width: 28px; height: 28px;
       border: 1px solid #d1d5db; border-radius: 6px;
       background: #fff; cursor: pointer;
-      font-size: 1.1rem; font-weight: 700; color: #374151;
+      font-size: 1rem; font-weight: 700; color: #374151;
       display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s;
+      transition: background 0.15s; flex-shrink: 0;
     }
     .h-btn:hover { background: #f3f4f6; }
-    #footer-height {
-      width: 72px; padding: 6px 8px;
+    .h-input {
+      width: 68px; padding: 5px 6px;
       border: 1px solid #d1d5db; border-radius: 6px;
-      font-size: 0.875rem; text-align: center;
+      font-size: 0.85rem; text-align: center;
       -moz-appearance: textfield;
     }
-    #footer-height::-webkit-outer-spin-button,
-    #footer-height::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    #footer-height:focus { outline: none; border-color: #4f46e5; }
-    #btn-detect {
-      padding: 6px 12px;
+    .h-input::-webkit-outer-spin-button,
+    .h-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .h-input:focus { outline: none; border-color: #4f46e5; }
+    .detect-btn {
+      padding: 5px 10px;
       border: 1px solid #4f46e5; border-radius: 6px;
       background: #fff; color: #4f46e5;
-      font-size: 0.8rem; font-weight: 600;
-      cursor: pointer; transition: background 0.15s;
+      font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s; white-space: nowrap;
     }
-    #btn-detect:hover { background: #eef2ff; }
-    #btn-detect:disabled { opacity: 0.5; cursor: not-allowed; }
-    #height-hint {
-      margin-top: 8px;
-      font-size: 0.78rem;
-      color: #9ca3af;
-    }
+    .detect-btn:hover { background: #eef2ff; }
+    .detect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .card-hint { font-size: 0.75rem; color: #9ca3af; margin-bottom: 10px; }
 
-    /* ── PDF Preview ── */
-    #preview-section { display: none; margin-top: 16px; }
-    .preview-label {
-      font-size: 0.75rem; font-weight: 700;
-      color: #9ca3af; text-transform: uppercase;
-      letter-spacing: 0.06em; margin-bottom: 8px;
-    }
-    #preview-wrap {
+    /* ── Per-card preview ── */
+    .card-preview-wrap {
       position: relative;
       border: 1px solid #e5e7eb;
-      border-radius: 8px;
+      border-radius: 6px;
       overflow: hidden;
       background: #e5e7eb;
-      max-height: 420px;
+      max-height: 280px;
       overflow-y: auto;
     }
-    #pdf-canvas { display: block; width: 100%; height: auto; }
-
-    #cut-line {
+    .card-preview-wrap canvas { display: block; width: 100%; height: auto; }
+    .preview-loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 80px;
+      font-size: 0.82rem; color: #9ca3af;
+      background: #f3f4f6;
+    }
+    .cut-line {
       position: absolute; left: 0; width: 100%;
       height: 2px; background: #ef4444;
       display: none; z-index: 2; pointer-events: none;
     }
-    #cut-label {
+    .cut-label {
       position: absolute; right: 8px;
       background: #ef4444; color: #fff;
       font-size: 0.68rem; font-weight: 700;
-      padding: 2px 7px; border-radius: 4px;
-      white-space: nowrap; pointer-events: none;
+      padding: 2px 6px; border-radius: 4px;
       transform: translateY(-100%);
-      margin-top: -2px;
+      white-space: nowrap;
     }
-    #cut-overlay {
+    .cut-overlay {
       position: absolute; left: 0; width: 100%;
       background: rgba(239,68,68,0.13);
       display: none; z-index: 1; pointer-events: none;
-    }
-    #preview-loading {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      background: #f3f4f6;
-      font-size: 0.85rem; color: #9ca3af;
     }
 
     /* ── Process button ── */
@@ -176,12 +180,12 @@
       display: flex; align-items: center; gap: 12px;
       padding: 12px 14px; border-radius: 8px;
       background: #f9fafb; border: 1px solid #e5e7eb;
-      font-size: 0.875rem;
+      font-size: 0.875rem; flex-wrap: wrap;
     }
     .result-row .filename {
       flex: 1; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap;
-      color: #374151; font-weight: 500;
+      color: #374151; font-weight: 500; min-width: 0;
     }
     .badge {
       padding: 3px 10px; border-radius: 20px;
@@ -199,23 +203,21 @@
     }
     .download-btn:hover { background: #4338ca; }
     .spinner {
-      width: 16px; height: 16px;
+      width: 16px; height: 16px; flex-shrink: 0;
       border: 2px solid #d1d5db; border-top-color: #b45309;
       border-radius: 50%; animation: spin 0.7s linear infinite;
-      flex-shrink: 0;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .icon { flex-shrink: 0; font-size: 1.1rem; }
-    .error-msg { font-size: 0.75rem; color: #ef4444; margin-top: 2px; }
+    .error-msg { font-size: 0.75rem; color: #ef4444; width: 100%; }
   </style>
 </head>
 <body>
 <div class="card">
   <h1>PDF Cleaner</h1>
-  <p class="subtitle">Removes footer and header logo from every page — one by one.</p>
+  <p class="subtitle">Removes footer and header logo from every page — set footer height per file.</p>
 
   <div class="drop-zone" id="drop-zone">
-    <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+    <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
       <path stroke-linecap="round" stroke-linejoin="round"
         d="M12 16v-8m0 0-3 3m3-3 3 3M6.75 19.5H17.25A2.25 2.25 0 0019.5 17.25v-9a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 8.25v9A2.25 2.25 0 006.75 19.5z"/>
     </svg>
@@ -224,71 +226,32 @@
     <input type="file" id="file-input" accept=".pdf" multiple />
   </div>
 
-  <div id="selected-list"></div>
-
-  <!-- Footer height control (shown after file selected) -->
-  <div id="height-section">
-    <div class="height-row">
-      <label for="footer-height">Footer height (pts)</label>
-      <div class="height-controls">
-        <button class="h-btn" id="btn-minus" type="button">&#8722;</button>
-        <input type="number" id="footer-height" min="0" max="600" placeholder="Auto" />
-        <button class="h-btn" id="btn-plus" type="button">&#43;</button>
-        <button id="btn-detect" type="button">Auto-detect</button>
-      </div>
-    </div>
-    <p id="height-hint">Leave empty to auto-detect. Red line shows where the footer will be cut.</p>
-  </div>
-
-  <!-- PDF preview (shown after file selected) -->
-  <div id="preview-section">
-    <p class="preview-label">Preview — page 1</p>
-    <div id="preview-wrap">
-      <div id="preview-loading">Loading preview…</div>
-      <canvas id="pdf-canvas"></canvas>
-      <div id="cut-line"><span id="cut-label"></span></div>
-      <div id="cut-overlay"></div>
-    </div>
-  </div>
+  <div id="cards-container"></div>
 
   <button id="process-btn" disabled>Process PDFs</button>
   <div id="results"></div>
 </div>
 
 <script>
-  // ── PDF.js setup ──────────────────────────────────────────────────────────
   const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
   pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_CDN + '/pdf.worker.min.js';
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let selectedFiles   = [];
-  let previewPageH    = 0;   // PDF page height in points
-  let previewScale    = 1;   // pts → canvas px multiplier
+  // Map: fid (int) → { file, pageHeight, scale }
+  const files = new Map();
+  let fidCounter = 0;
 
-  // ── DOM refs ──────────────────────────────────────────────────────────────
-  const dropZone      = document.getElementById('drop-zone');
-  const fileInput     = document.getElementById('file-input');
-  const browseLink    = document.getElementById('browse-link');
-  const selectedList  = document.getElementById('selected-list');
-  const processBtn    = document.getElementById('process-btn');
-  const results       = document.getElementById('results');
-  const heightSection = document.getElementById('height-section');
-  const previewSection= document.getElementById('preview-section');
-  const heightInput   = document.getElementById('footer-height');
-  const heightHint    = document.getElementById('height-hint');
-  const btnMinus      = document.getElementById('btn-minus');
-  const btnPlus       = document.getElementById('btn-plus');
-  const btnDetect     = document.getElementById('btn-detect');
-  const canvas        = document.getElementById('pdf-canvas');
-  const cutLine       = document.getElementById('cut-line');
-  const cutLabel      = document.getElementById('cut-label');
-  const cutOverlay    = document.getElementById('cut-overlay');
-  const previewLoading= document.getElementById('preview-loading');
+  const dropZone       = document.getElementById('drop-zone');
+  const fileInput      = document.getElementById('file-input');
+  const browseLink     = document.getElementById('browse-link');
+  const cardsContainer = document.getElementById('cards-container');
+  const processBtn     = document.getElementById('process-btn');
+  const results        = document.getElementById('results');
 
-  // ── Drop zone events ──────────────────────────────────────────────────────
+  // ── Drop zone ─────────────────────────────────────────────────────────────
   browseLink.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('click', e => { if (e.target !== browseLink) fileInput.click(); });
-  fileInput.addEventListener('change', () => addFiles(fileInput.files));
+  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
   dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => {
@@ -297,163 +260,220 @@
     addFiles(e.dataTransfer.files);
   });
 
+  // ── Add files ─────────────────────────────────────────────────────────────
   function addFiles(fileList) {
     for (const f of fileList) {
-      if (f.type === 'application/pdf' && !selectedFiles.find(x => x.name === f.name && x.size === f.size))
-        selectedFiles.push(f);
+      if (f.type !== 'application/pdf') continue;
+      if ([...files.values()].find(s => s.file.name === f.name && s.file.size === f.size)) continue;
+
+      const fid = fidCounter++;
+      files.set(fid, { file: f, pageHeight: 0, scale: 1 });
+
+      const card = buildCard(fid, f);
+      cardsContainer.appendChild(card);
+
+      // Wire events after card is in DOM
+      document.getElementById(`fh-${fid}`).addEventListener('input', () => updateCutLine(fid));
+      document.getElementById(`bminus-${fid}`).addEventListener('click', () => adjustHeight(fid, -1));
+      document.getElementById(`bplus-${fid}`).addEventListener('click', () => adjustHeight(fid, 1));
+      document.getElementById(`detect-${fid}`).addEventListener('click', () => detectHeight(fid));
+
+      renderPreview(fid);
     }
-    renderChips();
-    processBtn.disabled = selectedFiles.length === 0;
-    refreshPreview();
+    processBtn.disabled = files.size === 0;
   }
 
-  function removeFile(idx) {
-    selectedFiles.splice(idx, 1);
-    renderChips();
-    processBtn.disabled = selectedFiles.length === 0;
-    refreshPreview();
+  // ── Build card DOM ────────────────────────────────────────────────────────
+  function buildCard(fid, file) {
+    const card = document.createElement('div');
+    card.className = 'pdf-card';
+    card.id = `card-${fid}`;
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'pdf-card-header';
+
+    const icon = document.createElement('span');
+    icon.className = 'card-icon';
+    icon.textContent = '📄';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'card-name';
+    nameSpan.textContent = file.name;
+    nameSpan.title = file.name;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'card-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.title = 'Remove';
+    removeBtn.addEventListener('click', () => removeFile(fid));
+
+    header.append(icon, nameSpan, removeBtn);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'pdf-card-body';
+    body.innerHTML = `
+      <div class="card-height-row">
+        <label>Footer height (pts)</label>
+        <button class="h-btn" id="bminus-${fid}">&#8722;</button>
+        <input type="number" class="h-input" id="fh-${fid}" min="0" max="600" placeholder="Auto" />
+        <button class="h-btn" id="bplus-${fid}">&#43;</button>
+        <button class="detect-btn" id="detect-${fid}">Auto-detect</button>
+      </div>
+      <p class="card-hint" id="hint-${fid}">Leave empty to auto-detect. Red line shows the cut position.</p>
+      <div class="card-preview-wrap" id="wrap-${fid}">
+        <div class="preview-loading" id="pload-${fid}">Rendering preview…</div>
+        <canvas id="pcanvas-${fid}"></canvas>
+        <div class="cut-line" id="cline-${fid}"><span class="cut-label" id="clabel-${fid}"></span></div>
+        <div class="cut-overlay" id="coverlay-${fid}"></div>
+      </div>`;
+
+    card.append(header, body);
+    return card;
   }
 
-  function renderChips() {
-    selectedList.innerHTML = '';
-    selectedFiles.forEach((f, i) => {
-      const chip = document.createElement('div');
-      chip.className = 'chip';
-      chip.innerHTML = `${f.name} <button title="Remove" onclick="removeFile(${i})">&#x2715;</button>`;
-      selectedList.appendChild(chip);
-    });
+  // ── Remove file ───────────────────────────────────────────────────────────
+  function removeFile(fid) {
+    files.delete(fid);
+    document.getElementById(`card-${fid}`)?.remove();
+    processBtn.disabled = files.size === 0;
   }
 
-  // ── Preview visibility ────────────────────────────────────────────────────
-  function refreshPreview() {
-    if (selectedFiles.length === 0) {
-      heightSection.style.display = 'none';
-      previewSection.style.display = 'none';
-      previewPageH = 0;
-      return;
-    }
-    heightSection.style.display = 'block';
-    previewSection.style.display = 'block';
-    renderPdfPreview(selectedFiles[0]);
-  }
+  // ── PDF.js preview ────────────────────────────────────────────────────────
+  async function renderPreview(fid) {
+    const state = files.get(fid);
+    if (!state) return;
 
-  // ── PDF.js render ─────────────────────────────────────────────────────────
-  async function renderPdfPreview(file) {
-    previewLoading.style.display = 'flex';
-    canvas.style.display = 'none';
-    hideCutLine();
+    const loading = document.getElementById(`pload-${fid}`);
+    const canvas  = document.getElementById(`pcanvas-${fid}`);
+    const wrap    = document.getElementById(`wrap-${fid}`);
+
+    loading.style.display = 'flex';
+    canvas.style.display  = 'none';
+    hideCutLine(fid);
 
     try {
-      const buf  = await file.arrayBuffer();
+      const buf  = await state.file.arrayBuffer();
       const pdf  = await pdfjsLib.getDocument({ data: buf }).promise;
       const page = await pdf.getPage(1);
 
-      const vp1  = page.getViewport({ scale: 1 });
-      previewPageH = vp1.height;
+      const vp1 = page.getViewport({ scale: 1 });
+      state.pageHeight = vp1.height;
 
-      // Scale to fit container width
-      const containerW = document.getElementById('preview-wrap').clientWidth;
-      previewScale = containerW / vp1.width;
-      const vp   = page.getViewport({ scale: previewScale });
+      const w = wrap.clientWidth || 620;
+      state.scale = w / vp1.width;
+      const vp = page.getViewport({ scale: state.scale });
 
       canvas.width  = vp.width;
       canvas.height = vp.height;
+      canvas.style.display = 'block';
 
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-
-      previewLoading.style.display = 'none';
-      canvas.style.display = 'block';
-      updateCutLine();
-    } catch (err) {
-      previewLoading.textContent = 'Could not render preview.';
+      loading.style.display = 'none';
+      updateCutLine(fid);
+    } catch {
+      loading.textContent = 'Could not render preview.';
     }
   }
 
-  // ── Cut line overlay ──────────────────────────────────────────────────────
-  function updateCutLine() {
-    if (!previewPageH) return;
-    const val = parseFloat(heightInput.value);
-    if (!val || val <= 0) { hideCutLine(); return; }
+  // ── Cut line ──────────────────────────────────────────────────────────────
+  function updateCutLine(fid) {
+    const state   = files.get(fid);
+    const canvas  = document.getElementById(`pcanvas-${fid}`);
+    const cline   = document.getElementById(`cline-${fid}`);
+    const clabel  = document.getElementById(`clabel-${fid}`);
+    const coverlay= document.getElementById(`coverlay-${fid}`);
 
-    // Footer is from the bottom; cut Y from top = (pageHeight - footerHeight) * scale
-    const cutY = (previewPageH - val) * previewScale;
-    if (cutY < 0 || cutY > canvas.height) { hideCutLine(); return; }
+    if (!state?.pageHeight) { hideCutLine(fid); return; }
 
-    cutLine.style.display  = 'block';
-    cutLine.style.top      = cutY + 'px';
-    cutLabel.textContent   = val + ' pts';
-    cutOverlay.style.display = 'block';
-    cutOverlay.style.top   = cutY + 'px';
-    cutOverlay.style.height = (canvas.height - cutY) + 'px';
+    const val = parseFloat(document.getElementById(`fh-${fid}`)?.value);
+    if (!val || val <= 0) { hideCutLine(fid); return; }
+
+    const cutY = (state.pageHeight - val) * state.scale;
+    if (cutY < 0 || cutY > canvas.height) { hideCutLine(fid); return; }
+
+    cline.style.display   = 'block';
+    cline.style.top       = cutY + 'px';
+    clabel.textContent    = val + ' pts';
+    coverlay.style.display = 'block';
+    coverlay.style.top    = cutY + 'px';
+    coverlay.style.height = (canvas.height - cutY) + 'px';
   }
 
-  function hideCutLine() {
-    cutLine.style.display   = 'none';
-    cutOverlay.style.display = 'none';
+  function hideCutLine(fid) {
+    const cline   = document.getElementById(`cline-${fid}`);
+    const coverlay= document.getElementById(`coverlay-${fid}`);
+    if (cline)    cline.style.display    = 'none';
+    if (coverlay) coverlay.style.display = 'none';
   }
 
-  // ── Height input interactions ─────────────────────────────────────────────
-  heightInput.addEventListener('input', updateCutLine);
+  // ── Height controls ───────────────────────────────────────────────────────
+  function adjustHeight(fid, delta) {
+    const input = document.getElementById(`fh-${fid}`);
+    if (!input) return;
+    input.value = Math.max(0, (parseInt(input.value) || 0) + delta);
+    updateCutLine(fid);
+  }
 
-  btnMinus.addEventListener('click', () => {
-    const v = parseInt(heightInput.value) || 0;
-    heightInput.value = Math.max(0, v - 1);
-    updateCutLine();
-  });
-
-  btnPlus.addEventListener('click', () => {
-    const v = parseInt(heightInput.value) || 0;
-    heightInput.value = v + 1;
-    updateCutLine();
-  });
-
-  btnDetect.addEventListener('click', async () => {
-    if (selectedFiles.length === 0) return;
-    btnDetect.disabled    = true;
-    btnDetect.textContent = 'Detecting…';
-    heightHint.textContent = 'Sending first page to server…';
+  async function detectHeight(fid) {
+    const state = files.get(fid);
+    if (!state) return;
+    const btn  = document.getElementById(`detect-${fid}`);
+    const hint = document.getElementById(`hint-${fid}`);
+    btn.disabled    = true;
+    btn.textContent = 'Detecting…';
     try {
       const form = new FormData();
-      form.append('file', selectedFiles[0]);
+      form.append('file', state.file);
       const resp = await fetch('/detect-height', { method: 'POST', body: form });
       const data = await resp.json();
       if (data.footer_height_pts !== undefined) {
         const pts = Math.round(data.footer_height_pts);
-        heightInput.value = pts > 0 ? pts : '';
-        updateCutLine();
-        heightHint.textContent = pts > 0
-          ? `Auto-detected: ${pts} pts from the bottom of the page.`
-          : 'Auto-detect found no footer. Try entering a value manually.';
-      } else {
-        heightHint.textContent = 'Server returned an unexpected response.';
+        document.getElementById(`fh-${fid}`).value = pts > 0 ? pts : '';
+        updateCutLine(fid);
+        hint.textContent = pts > 0
+          ? `Auto-detected: ${pts} pts from bottom.`
+          : 'No footer detected. Enter manually if needed.';
       }
     } catch {
-      heightHint.textContent = 'Auto-detect failed. Please enter a value manually.';
+      hint.textContent = 'Auto-detect failed. Try manually.';
     } finally {
-      btnDetect.disabled    = false;
-      btnDetect.textContent = 'Auto-detect';
+      btn.disabled    = false;
+      btn.textContent = 'Auto-detect';
     }
-  });
+  }
 
   // ── Process ───────────────────────────────────────────────────────────────
   processBtn.addEventListener('click', async () => {
-    if (selectedFiles.length === 0) return;
+    if (files.size === 0) return;
 
     processBtn.disabled = true;
     results.innerHTML   = '';
 
+    const entries = [...files.entries()]; // [[fid, state], ...]
+
+    // Build results rows
     const rowMap = {};
-    selectedFiles.forEach(f => {
-      const row = createRow(f.name);
+    entries.forEach(([fid, state]) => {
+      const row = createResultRow(state.file.name);
       results.appendChild(row.el);
-      rowMap[f.name] = row;
+      rowMap[state.file.name] = row;
     });
 
-    const form = new FormData();
-    selectedFiles.forEach(f => form.append('files', f));
+    // Build form data
+    const form    = new FormData();
+    const heights = [];
+    entries.forEach(([fid, state]) => {
+      form.append('files', state.file);
+      const h = parseInt(document.getElementById(`fh-${fid}`)?.value);
+      heights.push(isNaN(h) ? null : h);
+    });
+    form.append('footer_heights', JSON.stringify(heights));
 
-    const heightVal = parseInt(heightInput.value);
-    if (heightVal > 0) form.append('footer_height', heightVal);
+    // Clear cards
+    files.clear();
+    cardsContainer.innerHTML = '';
 
     try {
       const resp = await fetch('/process', { method: 'POST', body: form });
@@ -471,51 +491,49 @@
         buf = lines.pop();
         for (const line of lines) {
           if (!line.trim()) continue;
-          try { updateRow(rowMap[JSON.parse(line).name], JSON.parse(line)); } catch (_) {}
+          try {
+            const msg = JSON.parse(line);
+            updateResultRow(rowMap[msg.name], msg);
+          } catch (_) {}
         }
       }
     } catch (err) {
-      const row = document.createElement('div');
-      row.className   = 'result-row';
-      row.style.color = '#ef4444';
-      row.textContent = 'Upload failed: ' + err.message;
-      results.appendChild(row);
+      const errEl = document.createElement('div');
+      errEl.className   = 'result-row';
+      errEl.style.color = '#ef4444';
+      errEl.textContent = 'Upload failed: ' + err.message;
+      results.appendChild(errEl);
     }
-
-    selectedFiles = [];
-    renderChips();
-    processBtn.disabled = true;
-    fileInput.value     = '';
-    heightSection.style.display  = 'none';
-    previewSection.style.display = 'none';
   });
 
-  // ── Row helpers ───────────────────────────────────────────────────────────
-  function createRow(name) {
+  // ── Result row helpers ────────────────────────────────────────────────────
+  function createResultRow(name) {
     const el = document.createElement('div');
     el.className = 'result-row';
-    el.innerHTML = `
-      <span class="icon">📄</span>
-      <span class="filename" title="${name}">${name}</span>
-      <span class="badge processing">Queued</span>`;
-    return { el, name };
+    const nameEl = document.createElement('span');
+    nameEl.className = 'filename';
+    nameEl.textContent = name;
+    nameEl.title = name;
+    const badge = document.createElement('span');
+    badge.className   = 'badge processing';
+    badge.textContent = 'Queued';
+    el.append(nameEl, badge);
+    return { el, badge };
   }
 
-  function updateRow(row, msg) {
+  function updateResultRow(row, msg) {
     if (!row) return;
-    const badge   = row.el.querySelector('.badge');
-    const spinner = row.el.querySelector('.spinner');
-    if (spinner) spinner.remove();
+    row.el.querySelector('.spinner')?.remove();
 
     if (msg.status === 'processing') {
       const sp = document.createElement('div');
       sp.className = 'spinner';
       row.el.insertBefore(sp, row.el.querySelector('.filename'));
-      badge.className   = 'badge processing';
-      badge.textContent = 'Processing…';
+      row.badge.className   = 'badge processing';
+      row.badge.textContent = 'Processing…';
     } else if (msg.status === 'done') {
-      badge.className   = 'badge done';
-      badge.textContent = 'Done ✓';
+      row.badge.className   = 'badge done';
+      row.badge.textContent = 'Done ✓';
       const a = document.createElement('a');
       a.className   = 'download-btn';
       a.href        = msg.download_url;
@@ -523,8 +541,8 @@
       a.textContent = 'Download';
       row.el.appendChild(a);
     } else if (msg.status === 'error') {
-      badge.className   = 'badge error';
-      badge.textContent = 'Error';
+      row.badge.className   = 'badge error';
+      row.badge.textContent = 'Error';
       const em = document.createElement('div');
       em.className   = 'error-msg';
       em.textContent = msg.error || 'Unknown error';

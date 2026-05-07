@@ -71,15 +71,26 @@ async def detect_height(file: Annotated[UploadFile, File()]):
 @app.post("/process")
 async def process_files(
     files: Annotated[List[UploadFile], File()],
-    footer_height: Annotated[Optional[int], Form()] = None,
+    footer_heights: Annotated[Optional[str], Form()] = None,
 ):
     if fitz is None:
         raise HTTPException(500, "PyMuPDF is not installed")
 
+    # Parse per-file footer heights: JSON array like [40, null, 60]
+    heights: list[Optional[int]] = []
+    if footer_heights:
+        try:
+            parsed = json.loads(footer_heights)
+            heights = [int(h) if h is not None and str(h).strip() != "" else None for h in parsed]
+        except Exception:
+            heights = []
+
     async def _stream():
-        for upload in files:
+        for i, upload in enumerate(files):
             name = upload.filename or "file.pdf"
+            safe_name = Path(name).name or "file.pdf"
             file_id = uuid.uuid4().hex
+            fh = heights[i] if i < len(heights) else None
 
             yield json.dumps({"name": name, "status": "processing"}) + "\n"
 
@@ -87,8 +98,10 @@ async def process_files(
                 raw = await upload.read()
                 src = _OUTPUT_DIR / f"{file_id}_in.pdf"
                 dst = _OUTPUT_DIR / f"{file_id}_out.pdf"
+                # Store original filename for download
+                (_OUTPUT_DIR / f"{file_id}_name.txt").write_text(safe_name, encoding="utf-8")
                 src.write_bytes(raw)
-                _process_pdf(src, dst, footer_height=footer_height)
+                _process_pdf(src, dst, footer_height=fh)
                 src.unlink(missing_ok=True)
 
                 yield json.dumps({
@@ -105,14 +118,11 @@ async def process_files(
 
 @app.get("/download/{file_id}")
 async def download(file_id: str):
-    # Reject any path traversal attempt
     if not file_id.isalnum():
         raise HTTPException(400, "Invalid file id")
     path = _OUTPUT_DIR / f"{file_id}_out.pdf"
     if not path.exists():
         raise HTTPException(404, "File not found")
-    return FileResponse(
-        str(path),
-        media_type="application/pdf",
-        filename=f"cleaned_{file_id[:8]}.pdf",
-    )
+    name_file = _OUTPUT_DIR / f"{file_id}_name.txt"
+    filename = name_file.read_text(encoding="utf-8").strip() if name_file.exists() else f"cleaned_{file_id[:8]}.pdf"
+    return FileResponse(str(path), media_type="application/pdf", filename=filename)
