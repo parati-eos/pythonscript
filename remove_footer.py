@@ -183,24 +183,52 @@ def is_dark_color(color) -> bool:
 
 
 def detect_header_logo_rect(page: "fitz.Page", pad: float = 3.0, verbose: bool = False) -> Optional["fitz.Rect"]:
-    """Find a small dark filled vector mark in the top-right header area."""
+    """Find a logo in the top header area — checks both vector drawings and raster images,
+    on either the left or right side of the page."""
     page_rect = page.rect
+    pw, ph = page_rect.width, page_rect.height
     candidates = []
+
+    # ── 1. Vector drawings (dark filled shapes) ───────────────────────────────
     for drawing in page.get_drawings():
         rect = drawing.get("rect")
         if rect is None or not is_dark_color(drawing.get("fill")):
             continue
-
-        width = rect.width
-        height = rect.height
-        area = width * height
-        in_header = rect.y0 <= page_rect.y0 + page_rect.height * 0.10
-        on_right = rect.x0 >= page_rect.x0 + page_rect.width * 0.80
-        plausible_size = 8 <= width <= 70 and 8 <= height <= 70 and area <= 3000
-        if in_header and on_right and plausible_size:
+        w, h = rect.width, rect.height
+        area = w * h
+        in_header  = rect.y0 <= page_rect.y0 + ph * 0.12
+        on_side    = (rect.x0 <= page_rect.x0 + pw * 0.30 or   # left third
+                      rect.x0 >= page_rect.x0 + pw * 0.70)     # right third
+        right_size = 5 <= w <= 120 and 5 <= h <= 100 and area <= 10000
+        if in_header and on_side and right_size:
             candidates.append((area, rect))
+            if verbose:
+                print(f"Vector logo candidate: {rect}  area={area:.0f}")
+
+    # ── 2. Raster image blocks in header ─────────────────────────────────────
+    try:
+        blocks = page.get_text("dict", flags=0).get("blocks", [])
+        for block in blocks:
+            if block.get("type") != 1:   # 1 = image block
+                continue
+            bbox = fitz.Rect(block["bbox"])
+            w, h = bbox.width, bbox.height
+            area = w * h
+            in_header = bbox.y0 <= page_rect.y0 + ph * 0.15
+            on_side   = (bbox.x0 <= page_rect.x0 + pw * 0.35 or
+                         bbox.x0 >= page_rect.x0 + pw * 0.65)
+            right_size = 5 <= w <= 200 and 5 <= h <= 120
+            if in_header and on_side and right_size:
+                candidates.append((area, bbox))
+                if verbose:
+                    print(f"Raster logo candidate: {bbox}  area={area:.0f}")
+    except Exception as e:
+        if verbose:
+            print(f"Raster image scan failed: {e}")
 
     if not candidates:
+        if verbose:
+            print("No header logo detected")
         return None
 
     _, rect = max(candidates, key=lambda item: item[0])
