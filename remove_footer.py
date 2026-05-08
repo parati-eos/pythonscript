@@ -189,23 +189,51 @@ def detect_header_logo_rect(page: "fitz.Page", pad: float = 3.0, verbose: bool =
     pw, ph = page_rect.width, page_rect.height
     candidates = []
 
-    # ── 1. Vector drawings (dark filled shapes) ───────────────────────────────
+    # ── 1. Vector drawings (dark filled or stroked shapes) ────────────────────
     for drawing in page.get_drawings():
         rect = drawing.get("rect")
-        if rect is None or not is_dark_color(drawing.get("fill")):
+        if rect is None:
+            continue
+        fill  = drawing.get("fill")
+        color = drawing.get("color")
+        # accept dark fill OR dark stroke (some logos are stroked, not filled)
+        if not (is_dark_color(fill) or is_dark_color(color)):
             continue
         w, h = rect.width, rect.height
         area = w * h
-        in_header  = rect.y0 <= page_rect.y0 + ph * 0.12
-        on_side    = (rect.x0 <= page_rect.x0 + pw * 0.30 or   # left third
-                      rect.x0 >= page_rect.x0 + pw * 0.70)     # right third
-        right_size = 5 <= w <= 120 and 5 <= h <= 100 and area <= 10000
+        in_header  = rect.y0 <= page_rect.y0 + ph * 0.18
+        on_side    = (rect.x0 <= page_rect.x0 + pw * 0.35 or
+                      rect.x0 >= page_rect.x0 + pw * 0.60)
+        right_size = 5 <= w <= 150 and 5 <= h <= 120 and area <= 15000
         if in_header and on_side and right_size:
             candidates.append((area, rect))
             if verbose:
                 print(f"Vector logo candidate: {rect}  area={area:.0f}")
 
-    # ── 2. Raster image blocks in header ─────────────────────────────────────
+    # ── 2. Images via get_images() + get_image_rects() (catches XObjects too) ──
+    try:
+        for img_tuple in page.get_images(full=True):
+            xref = img_tuple[0]
+            try:
+                for img_rect in page.get_image_rects(xref):
+                    bbox = fitz.Rect(img_rect)
+                    w, h = bbox.width, bbox.height
+                    area = w * h
+                    in_header = bbox.y0 <= page_rect.y0 + ph * 0.18
+                    on_side   = (bbox.x0 <= page_rect.x0 + pw * 0.35 or
+                                 bbox.x0 >= page_rect.x0 + pw * 0.60)
+                    right_size = 5 <= w <= 250 and 5 <= h <= 150
+                    if in_header and on_side and right_size:
+                        candidates.append((area, bbox))
+                        if verbose:
+                            print(f"Image XObject candidate: {bbox}  area={area:.0f}")
+            except Exception:
+                continue
+    except Exception as e:
+        if verbose:
+            print(f"get_images scan failed: {e}")
+
+    # ── 3. Raster image blocks via get_text dict (fallback) ──────────────────
     try:
         blocks = page.get_text("dict", flags=0).get("blocks", [])
         for block in blocks:
@@ -214,14 +242,14 @@ def detect_header_logo_rect(page: "fitz.Page", pad: float = 3.0, verbose: bool =
             bbox = fitz.Rect(block["bbox"])
             w, h = bbox.width, bbox.height
             area = w * h
-            in_header = bbox.y0 <= page_rect.y0 + ph * 0.15
+            in_header = bbox.y0 <= page_rect.y0 + ph * 0.18
             on_side   = (bbox.x0 <= page_rect.x0 + pw * 0.35 or
-                         bbox.x0 >= page_rect.x0 + pw * 0.65)
-            right_size = 5 <= w <= 200 and 5 <= h <= 120
+                         bbox.x0 >= page_rect.x0 + pw * 0.60)
+            right_size = 5 <= w <= 250 and 5 <= h <= 150
             if in_header and on_side and right_size:
                 candidates.append((area, bbox))
                 if verbose:
-                    print(f"Raster logo candidate: {bbox}  area={area:.0f}")
+                    print(f"Raster block candidate: {bbox}  area={area:.0f}")
     except Exception as e:
         if verbose:
             print(f"Raster image scan failed: {e}")
