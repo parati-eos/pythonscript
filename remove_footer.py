@@ -307,9 +307,12 @@ def header_logo_rect_for_page(page: "fitz.Page", explicit_rect, pad: float, verb
 
 def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explicit_rect=None, pad: float = 3.0,
                       preserve_lines: bool = True, verbose: bool = False):
-    """Cover the header logo zone on every page using PDF redaction.
-    Always targets the top-right corner (top 15%, right 30%) unless explicit_rect given.
-    Redaction removes the underlying content rather than just painting over it."""
+    """Remove everything in the top-right logo zone on every page.
+    Uses three layers to handle all PDF encoding types:
+      1. Delete any stamp/watermark annotations in the zone
+      2. PDF redaction (strips embedded images, XObjects, vector content)
+      3. White rect painted on top (belt-and-suspenders)
+    Always targets top-right corner (top 15%, right 30%) unless explicit_rect given."""
     rgb_01 = rgb255_to_pdf(color)
     for i, page in enumerate(doc, start=1):
         pr = page.rect
@@ -323,16 +326,34 @@ def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explici
                 pr.y0 + pr.height * 0.15,
             )
 
+        # Capture lines that cross the zone BEFORE any modification
         lines = horizontal_lines_through_rect(page, rect) if preserve_lines else []
+
+        # 1. Remove annotations (stamp annotations render above content stream)
+        try:
+            for annot in list(page.annots()):
+                if fitz.Rect(annot.rect).intersects(rect):
+                    page.delete_annot(annot)
+                    if verbose:
+                        print(f"Page {i}: deleted annotation in logo zone")
+        except Exception:
+            pass
+
+        # 2. PDF redaction — strips images (2) and line-art/XObjects (3)
         try:
             page.add_redact_annot(rect, fill=rgb_01)
-            page.apply_redactions()
-        except Exception:
-            # Fallback: paint white rectangle if redaction fails
-            draw_cover_rect(page, rect, rgb_01)
+            page.apply_redactions(images=2, graphics=3)
+        except Exception as exc:
+            if verbose:
+                print(f"Page {i}: redaction failed ({exc}), using paint fallback")
+
+        # 3. White rect on top — catches anything redaction missed
+        draw_cover_rect(page, rect, rgb_01)
+
+        # Restore any header separator lines that crossed the zone
         redraw_lines(page, lines, verbose=verbose)
         if verbose:
-            print(f"Page {i}: removed header logo zone {rect}")
+            print(f"Page {i}: logo zone cleared {rect}")
 
 
 def redact_header_logo(doc: "fitz.Document", explicit_rect=None, pad: float = 3.0,
