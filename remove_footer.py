@@ -183,86 +183,80 @@ def is_dark_color(color) -> bool:
 
 
 def detect_header_logo_rect(page: "fitz.Page", pad: float = 3.0, verbose: bool = False) -> Optional["fitz.Rect"]:
-    """Find a logo in the top header area — checks both vector drawings and raster images,
-    on either the left or right side of the page."""
+    """Cover everything found in the top-right corner zone (top 18%, right 30%).
+    This reliably removes chapter/section logo boxes regardless of how they're encoded."""
     page_rect = page.rect
     pw, ph = page_rect.width, page_rect.height
-    candidates = []
 
-    # ── 1. Vector drawings (dark filled or stroked shapes) ────────────────────
-    for drawing in page.get_drawings():
-        rect = drawing.get("rect")
-        if rect is None:
-            continue
-        fill  = drawing.get("fill")
-        color = drawing.get("color")
-        # accept dark fill OR dark stroke (some logos are stroked, not filled)
-        if not (is_dark_color(fill) or is_dark_color(color)):
-            continue
-        w, h = rect.width, rect.height
-        area = w * h
-        in_header  = rect.y0 <= page_rect.y0 + ph * 0.18
-        on_side    = (rect.x0 <= page_rect.x0 + pw * 0.35 or
-                      rect.x0 >= page_rect.x0 + pw * 0.60)
-        right_size = 5 <= w <= 150 and 5 <= h <= 120 and area <= 15000
-        if in_header and on_side and right_size:
-            candidates.append((area, rect))
-            if verbose:
-                print(f"Vector logo candidate: {rect}  area={area:.0f}")
+    # Search zone: top-right corner only
+    zone = fitz.Rect(
+        page_rect.x0 + pw * 0.70,
+        page_rect.y0,
+        page_rect.x1,
+        page_rect.y0 + ph * 0.18,
+    )
 
-    # ── 2. Images via get_images() + get_image_rects() (catches XObjects too) ──
+    found: list["fitz.Rect"] = []
+
+    # 1. Images and Form XObjects
     try:
         for img_tuple in page.get_images(full=True):
             xref = img_tuple[0]
             try:
-                for img_rect in page.get_image_rects(xref):
-                    bbox = fitz.Rect(img_rect)
-                    w, h = bbox.width, bbox.height
-                    area = w * h
-                    in_header = bbox.y0 <= page_rect.y0 + ph * 0.18
-                    on_side   = (bbox.x0 <= page_rect.x0 + pw * 0.35 or
-                                 bbox.x0 >= page_rect.x0 + pw * 0.60)
-                    right_size = 5 <= w <= 250 and 5 <= h <= 150
-                    if in_header and on_side and right_size:
-                        candidates.append((area, bbox))
+                for r in page.get_image_rects(xref):
+                    bbox = fitz.Rect(r)
+                    if bbox.intersects(zone):
+                        found.append(bbox)
                         if verbose:
-                            print(f"Image XObject candidate: {bbox}  area={area:.0f}")
+                            print(f"Image XObject in zone: {bbox}")
             except Exception:
                 continue
     except Exception as e:
         if verbose:
-            print(f"get_images scan failed: {e}")
+            print(f"get_images failed: {e}")
 
-    # ── 3. Raster image blocks via get_text dict (fallback) ──────────────────
+    # 2. Vector drawings (any color — include stroked outlines, filled shapes, etc.)
+    for drawing in page.get_drawings():
+        rect = drawing.get("rect")
+        if rect is None:
+            continue
+        r = fitz.Rect(rect)
+        if r.intersects(zone) and r.width <= pw * 0.30 and r.height <= ph * 0.18:
+            found.append(r)
+            if verbose:
+                print(f"Drawing in zone: {r}")
+
+    # 3. Text/image blocks (catches logos rendered as special-font glyphs)
     try:
-        blocks = page.get_text("dict", flags=0).get("blocks", [])
-        for block in blocks:
-            if block.get("type") != 1:   # 1 = image block
-                continue
+        for block in page.get_text("dict", flags=0).get("blocks", []):
             bbox = fitz.Rect(block["bbox"])
-            w, h = bbox.width, bbox.height
-            area = w * h
-            in_header = bbox.y0 <= page_rect.y0 + ph * 0.18
-            on_side   = (bbox.x0 <= page_rect.x0 + pw * 0.35 or
-                         bbox.x0 >= page_rect.x0 + pw * 0.60)
-            right_size = 5 <= w <= 250 and 5 <= h <= 150
-            if in_header and on_side and right_size:
-                candidates.append((area, bbox))
+            if bbox.intersects(zone):
+                found.append(bbox)
                 if verbose:
-                    print(f"Raster block candidate: {bbox}  area={area:.0f}")
+                    print(f"Block in zone: {bbox}")
     except Exception as e:
         if verbose:
-            print(f"Raster image scan failed: {e}")
+            print(f"get_text dict failed: {e}")
 
-    if not candidates:
+    if not found:
         if verbose:
-            print("No header logo detected")
+            print("No elements found in top-right logo zone")
         return None
 
-    _, rect = max(candidates, key=lambda item: item[0])
-    result = padded_rect(rect, page_rect, pad)
+    # Union all found rects
+    union = found[0]
+    for r in found[1:]:
+        union = union | r
+
+    # Sanity: result must not be unreasonably large
+    if union.width > pw * 0.32 or union.height > ph * 0.20:
+        if verbose:
+            print(f"Zone union too large ({union.width:.0f}×{union.height:.0f}), skipping")
+        return None
+
+    result = padded_rect(union, page_rect, pad)
     if verbose:
-        print(f"Detected header logo rect: {result}")
+        print(f"Header logo rect: {result}")
     return result
 
 
