@@ -307,19 +307,32 @@ def header_logo_rect_for_page(page: "fitz.Page", explicit_rect, pad: float, verb
 
 def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explicit_rect=None, pad: float = 3.0,
                       preserve_lines: bool = True, verbose: bool = False):
-    rgb = rgb255_to_pdf(color)
+    """Cover the header logo zone on every page using PDF redaction.
+    Always targets the top-right corner (top 15%, right 30%) unless explicit_rect given.
+    Redaction removes the underlying content rather than just painting over it."""
+    rgb_01 = rgb255_to_pdf(color)
     for i, page in enumerate(doc, start=1):
-        rect = header_logo_rect_for_page(page, explicit_rect, pad=pad, verbose=verbose)
-        if rect is None:
-            if verbose:
-                print(f"Page {i}: no header logo detected")
-            continue
+        pr = page.rect
+        if explicit_rect is not None:
+            rect = padded_rect(fitz.Rect(*explicit_rect), pr, pad)
+        else:
+            rect = fitz.Rect(
+                pr.x0 + pr.width * 0.70,
+                pr.y0,
+                pr.x1,
+                pr.y0 + pr.height * 0.15,
+            )
 
         lines = horizontal_lines_through_rect(page, rect) if preserve_lines else []
-        draw_cover_rect(page, rect, rgb)
+        try:
+            page.add_redact_annot(rect, fill=rgb_01)
+            page.apply_redactions()
+        except Exception:
+            # Fallback: paint white rectangle if redaction fails
+            draw_cover_rect(page, rect, rgb_01)
         redraw_lines(page, lines, verbose=verbose)
         if verbose:
-            print(f"Page {i}: covered header logo rect {rect}")
+            print(f"Page {i}: removed header logo zone {rect}")
 
 
 def redact_header_logo(doc: "fitz.Document", explicit_rect=None, pad: float = 3.0,

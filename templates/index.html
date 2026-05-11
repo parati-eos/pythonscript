@@ -163,6 +163,23 @@
       display: none; z-index: 1; pointer-events: none;
     }
 
+    /* Header logo zone indicator */
+    .logo-zone {
+      position: absolute; right: 0; top: 0;
+      width: 30%; height: 15%;
+      background: rgba(79,70,229,0.12);
+      border: 2px solid rgba(79,70,229,0.55);
+      border-top: none; border-right: none;
+      display: none; z-index: 2; pointer-events: none;
+    }
+    .logo-zone-label {
+      position: absolute; bottom: 4px; left: 6px;
+      background: #4f46e5; color: #fff;
+      font-size: 0.65rem; font-weight: 700;
+      padding: 2px 5px; border-radius: 4px;
+      white-space: nowrap;
+    }
+
     /* ── Process button ── */
     #process-btn {
       margin-top: 24px; width: 100%; padding: 12px;
@@ -214,7 +231,7 @@
 <body>
 <div class="card">
   <h1>PDF Cleaner</h1>
-  <p class="subtitle">Removes footer and header logo from every page — set footer height per file.</p>
+  <p class="subtitle">Removes footer and top-right header logo from every page — set footer height per file.</p>
 
   <div class="drop-zone" id="drop-zone">
     <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -325,6 +342,7 @@
       <div class="card-preview-wrap" id="wrap-${fid}">
         <div class="preview-loading" id="pload-${fid}">Rendering preview…</div>
         <canvas id="pcanvas-${fid}"></canvas>
+        <div class="logo-zone" id="lzone-${fid}"><span class="logo-zone-label">Header logo removed</span></div>
         <div class="cut-line" id="cline-${fid}"><span class="cut-label" id="clabel-${fid}"></span></div>
         <div class="cut-overlay" id="coverlay-${fid}"></div>
       </div>`;
@@ -371,6 +389,9 @@
 
       await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
       loading.style.display = 'none';
+      // Show header logo zone indicator (top-right 30% × 15%)
+      const lzone = document.getElementById(`lzone-${fid}`);
+      if (lzone) lzone.style.display = 'block';
       updateCutLine(fid);
     } catch {
       loading.textContent = 'Could not render preview.';
@@ -406,6 +427,11 @@
     const coverlay= document.getElementById(`coverlay-${fid}`);
     if (cline)    cline.style.display    = 'none';
     if (coverlay) coverlay.style.display = 'none';
+  }
+
+  function hideLogoZone(fid) {
+    const lzone = document.getElementById(`lzone-${fid}`);
+    if (lzone) lzone.style.display = 'none';
   }
 
   // ── Height controls ───────────────────────────────────────────────────────
