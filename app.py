@@ -36,7 +36,8 @@ def _process_pdf(src: Path, dst: Path, footer_height: Optional[int] = None) -> N
     height_pts = footer_height if footer_height is not None else detect_footer_height(doc)
     if height_pts > 0:
         cover_footer(doc, height_pts, color=(255, 255, 255))
-    cover_header_logo(doc, color=(255, 255, 255))
+    # Header logo removal disabled — to be re-approached
+    # cover_header_logo(doc, color=(255, 255, 255))
     doc.save(str(dst), garbage=4, deflate=True)
     doc.close()
 
