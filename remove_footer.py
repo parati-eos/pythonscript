@@ -339,10 +339,12 @@ def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explici
         except Exception:
             pass
 
-        # 2. PDF redaction — strips images (2) and line-art/XObjects (3)
+        # 2. PDF redaction — strips images in zone (2) and line-art inside zone only (1)
+        # graphics=1 = remove only graphics FULLY covered by the redaction rect (not page-wide)
+        # graphics=3 would remove ALL graphics on the entire page — do NOT use
         try:
             page.add_redact_annot(rect, fill=rgb_01)
-            page.apply_redactions(images=2, graphics=3)
+            page.apply_redactions(images=2, graphics=1)
         except Exception as exc:
             if verbose:
                 print(f"Page {i}: redaction failed ({exc}), using paint fallback")
