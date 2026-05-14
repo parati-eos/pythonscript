@@ -182,46 +182,82 @@ def is_dark_color(color) -> bool:
     return color is not None and sum(float(c) for c in color) <= 0.75
 
 
-def detect_header_logo_rect(page: "fitz.Page", pad: float = 3.0, verbose: bool = False) -> Optional["fitz.Rect"]:
-    """Detect a logo in the top-right corner by rendering that zone at low DPI and counting
-    dark pixels. A logo (solid filled box) has many dark pixels; a thin separator line has very
-    few. Returns the zone rect if a logo is detected, None otherwise."""
+def detect_header_logo_rect(page: "fitz.Page", pad: float = 2.0, verbose: bool = False) -> Optional["fitz.Rect"]:
+    """Find the tight bounding box of the header logo using pixel row analysis.
+
+    Search zone: right 15% × top 12%.  Renders at 72 DPI and counts dark pixels per row.
+    A thin separator line gives at most 2 consecutive dark rows; the logo box gives 10+.
+    Returns the tight logo rect (not the full zone), so the separator line is untouched."""
     page_rect = page.rect
     pw, ph = page_rect.width, page_rect.height
 
-    # Candidate zone: top-right corner (top 18%, right 30%)
     zone = fitz.Rect(
-        page_rect.x0 + pw * 0.70,
+        page_rect.x1 - pw * 0.15,
         page_rect.y0,
         page_rect.x1,
-        page_rect.y0 + ph * 0.18,
+        page_rect.y0 + ph * 0.12,
     )
 
     try:
-        # Render zone at low DPI in grayscale for fast pixel counting
-        pix = page.get_pixmap(clip=zone, dpi=36, colorspace=fitz.csGRAY)
-        samples = pix.samples  # bytes: 0=black, 255=white
-        total = len(samples)
-        if total == 0:
-            return None
-        dark = sum(1 for b in samples if b < 180)
-        ratio = dark / total
+        pix = page.get_pixmap(clip=zone, dpi=72, colorspace=fitz.csGRAY)
+        w, h = pix.width, pix.height
+        samples = pix.samples  # grayscale bytes: 0=black, 255=white
+
+        # Find rows where >10% of pixels are dark
+        dark_row = [
+            sum(1 for x in range(w) if samples[y * w + x] < 128) / w > 0.10
+            for y in range(h)
+        ]
+
+        # Find longest consecutive run of dark rows
+        best_start = best_len = cur_start = cur_len = 0
+        for y, is_dark in enumerate(dark_row):
+            if is_dark:
+                if cur_len == 0:
+                    cur_start = y
+                cur_len += 1
+                if cur_len > best_len:
+                    best_len, best_start = cur_len, cur_start
+            else:
+                cur_len = 0
+
         if verbose:
-            print(f"Logo zone dark pixel ratio: {ratio:.3f} ({dark}/{total})")
-        # A separator line contributes < 2%; a solid logo box contributes 5%+
-        if ratio < 0.03:
-            if verbose:
-                print("Dark pixel ratio too low — no logo detected")
+            print(f"Logo zone: longest dark-row run = {best_len} rows")
+
+        # A thin separator line ≤ 2 consecutive rows; logo box ≥ 5
+        if best_len < 5:
             return None
+
+        # Find tight x-extent inside the detected row band
+        row_range = range(best_start, best_start + best_len)
+        min_x = w; max_x = 0
+        for y in row_range:
+            for x in range(w):
+                if samples[y * w + x] < 128:
+                    if x < min_x: min_x = x
+                    if x > max_x: max_x = x
+
+        if max_x <= min_x:
+            return None
+
+        # Convert pixel coords → PDF points
+        sx = zone.width / w
+        sy = zone.height / h
+        logo_rect = fitz.Rect(
+            zone.x0 + min_x * sx,
+            zone.y0 + best_start * sy,
+            zone.x0 + (max_x + 1) * sx,
+            zone.y0 + (best_start + best_len) * sy,
+        )
+        result = padded_rect(logo_rect, page_rect, pad)
+        if verbose:
+            print(f"Logo rect: {result}")
+        return result
+
     except Exception as e:
         if verbose:
-            print(f"Pixel check failed: {e} — assuming no logo")
+            print(f"Pixel analysis failed: {e}")
         return None
-
-    result = padded_rect(zone, page_rect, pad)
-    if verbose:
-        print(f"Logo detected (ratio={ratio:.3f}), zone rect: {result}")
-    return result
 
 
 def horizontal_lines_through_rect(page: "fitz.Page", rect: "fitz.Rect"):
@@ -269,12 +305,10 @@ def header_logo_rect_for_page(page: "fitz.Page", explicit_rect, pad: float, verb
     return detect_header_logo_rect(page, pad=pad, verbose=verbose)
 
 
-def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explicit_rect=None, pad: float = 3.0,
+def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explicit_rect=None, pad: float = 2.0,
                       preserve_lines: bool = True, verbose: bool = False):
-    """Remove the header logo on pages where one is detected.
-    Uses pixel-based detection: renders the top-right zone and only acts if there are enough
-    dark pixels to indicate an actual logo (not just a thin separator line).
-    Triple-layer removal: delete annots → redact → paint white."""
+    """Remove the header logo using pixel detection + targeted white rect.
+    Zone is tiny (rightmost 8% × top 10%) so nothing outside the logo is affected."""
     rgb_01 = rgb255_to_pdf(color)
     for i, page in enumerate(doc, start=1):
         pr = page.rect
@@ -284,37 +318,28 @@ def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explici
             rect = detect_header_logo_rect(page, pad=pad, verbose=verbose)
             if rect is None:
                 if verbose:
-                    print(f"Page {i}: no logo detected, skipping")
+                    print(f"Page {i}: no logo, skipping")
                 continue
 
-        # Capture lines that cross the zone BEFORE any modification
-        lines = horizontal_lines_through_rect(page, rect) if preserve_lines else []
-
-        # 1. Remove annotations (stamp annotations render above content stream)
+        # 1. Delete stamp/watermark annotations in the zone
         try:
             for annot in list(page.annots()):
                 if fitz.Rect(annot.rect).intersects(rect):
                     page.delete_annot(annot)
-                    if verbose:
-                        print(f"Page {i}: deleted annotation in logo zone")
         except Exception:
             pass
 
-        # 2. PDF redaction — images in zone (2), line-art inside zone only (1)
+        # 2. Wrap existing content in q/Q so our rect is guaranteed last
         try:
-            page.add_redact_annot(rect, fill=rgb_01)
-            page.apply_redactions(images=2, graphics=1)
-        except Exception as exc:
-            if verbose:
-                print(f"Page {i}: redaction failed ({exc}), using paint fallback")
+            page.wrap_contents()
+        except Exception:
+            pass
 
-        # 3. White rect on top — belt-and-suspenders
+        # 3. Paint white over the logo zone
         draw_cover_rect(page, rect, rgb_01)
 
-        # Restore any header separator lines that passed through the zone
-        redraw_lines(page, lines, verbose=verbose)
         if verbose:
-            print(f"Page {i}: logo zone cleared {rect}")
+            print(f"Page {i}: logo cleared at {rect}")
 
 
 def redact_header_logo(doc: "fitz.Document", explicit_rect=None, pad: float = 3.0,
