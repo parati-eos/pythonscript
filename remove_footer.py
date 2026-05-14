@@ -183,12 +183,13 @@ def is_dark_color(color) -> bool:
 
 
 def detect_header_logo_rect(page: "fitz.Page", pad: float = 3.0, verbose: bool = False) -> Optional["fitz.Rect"]:
-    """Cover everything found in the top-right corner zone (top 18%, right 30%).
-    This reliably removes chapter/section logo boxes regardless of how they're encoded."""
+    """Detect a logo in the top-right corner by rendering that zone at low DPI and counting
+    dark pixels. A logo (solid filled box) has many dark pixels; a thin separator line has very
+    few. Returns the zone rect if a logo is detected, None otherwise."""
     page_rect = page.rect
     pw, ph = page_rect.width, page_rect.height
 
-    # Search zone: top-right corner only
+    # Candidate zone: top-right corner (top 18%, right 30%)
     zone = fitz.Rect(
         page_rect.x0 + pw * 0.70,
         page_rect.y0,
@@ -196,67 +197,30 @@ def detect_header_logo_rect(page: "fitz.Page", pad: float = 3.0, verbose: bool =
         page_rect.y0 + ph * 0.18,
     )
 
-    found: list["fitz.Rect"] = []
-
-    # 1. Images and Form XObjects
     try:
-        for img_tuple in page.get_images(full=True):
-            xref = img_tuple[0]
-            try:
-                for r in page.get_image_rects(xref):
-                    bbox = fitz.Rect(r)
-                    if bbox.intersects(zone):
-                        found.append(bbox)
-                        if verbose:
-                            print(f"Image XObject in zone: {bbox}")
-            except Exception:
-                continue
-    except Exception as e:
+        # Render zone at low DPI in grayscale for fast pixel counting
+        pix = page.get_pixmap(clip=zone, dpi=36, colorspace=fitz.csGRAY)
+        samples = pix.samples  # bytes: 0=black, 255=white
+        total = len(samples)
+        if total == 0:
+            return None
+        dark = sum(1 for b in samples if b < 180)
+        ratio = dark / total
         if verbose:
-            print(f"get_images failed: {e}")
-
-    # 2. Vector drawings (any color — include stroked outlines, filled shapes, etc.)
-    for drawing in page.get_drawings():
-        rect = drawing.get("rect")
-        if rect is None:
-            continue
-        r = fitz.Rect(rect)
-        if r.intersects(zone) and r.width <= pw * 0.30 and r.height <= ph * 0.18:
-            found.append(r)
+            print(f"Logo zone dark pixel ratio: {ratio:.3f} ({dark}/{total})")
+        # A separator line contributes < 2%; a solid logo box contributes 5%+
+        if ratio < 0.03:
             if verbose:
-                print(f"Drawing in zone: {r}")
-
-    # 3. Text/image blocks (catches logos rendered as special-font glyphs)
-    try:
-        for block in page.get_text("dict", flags=0).get("blocks", []):
-            bbox = fitz.Rect(block["bbox"])
-            if bbox.intersects(zone):
-                found.append(bbox)
-                if verbose:
-                    print(f"Block in zone: {bbox}")
+                print("Dark pixel ratio too low — no logo detected")
+            return None
     except Exception as e:
         if verbose:
-            print(f"get_text dict failed: {e}")
-
-    if not found:
-        if verbose:
-            print("No elements found in top-right logo zone")
+            print(f"Pixel check failed: {e} — assuming no logo")
         return None
 
-    # Union all found rects
-    union = found[0]
-    for r in found[1:]:
-        union = union | r
-
-    # Sanity: result must not be unreasonably large
-    if union.width > pw * 0.32 or union.height > ph * 0.20:
-        if verbose:
-            print(f"Zone union too large ({union.width:.0f}×{union.height:.0f}), skipping")
-        return None
-
-    result = padded_rect(union, page_rect, pad)
+    result = padded_rect(zone, page_rect, pad)
     if verbose:
-        print(f"Header logo rect: {result}")
+        print(f"Logo detected (ratio={ratio:.3f}), zone rect: {result}")
     return result
 
 
@@ -307,24 +271,21 @@ def header_logo_rect_for_page(page: "fitz.Page", explicit_rect, pad: float, verb
 
 def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explicit_rect=None, pad: float = 3.0,
                       preserve_lines: bool = True, verbose: bool = False):
-    """Remove everything in the top-right logo zone on every page.
-    Uses three layers to handle all PDF encoding types:
-      1. Delete any stamp/watermark annotations in the zone
-      2. PDF redaction (strips embedded images, XObjects, vector content)
-      3. White rect painted on top (belt-and-suspenders)
-    Always targets top-right corner (top 15%, right 30%) unless explicit_rect given."""
+    """Remove the header logo on pages where one is detected.
+    Uses pixel-based detection: renders the top-right zone and only acts if there are enough
+    dark pixels to indicate an actual logo (not just a thin separator line).
+    Triple-layer removal: delete annots → redact → paint white."""
     rgb_01 = rgb255_to_pdf(color)
     for i, page in enumerate(doc, start=1):
         pr = page.rect
         if explicit_rect is not None:
             rect = padded_rect(fitz.Rect(*explicit_rect), pr, pad)
         else:
-            rect = fitz.Rect(
-                pr.x0 + pr.width * 0.70,
-                pr.y0,
-                pr.x1,
-                pr.y0 + pr.height * 0.15,
-            )
+            rect = detect_header_logo_rect(page, pad=pad, verbose=verbose)
+            if rect is None:
+                if verbose:
+                    print(f"Page {i}: no logo detected, skipping")
+                continue
 
         # Capture lines that cross the zone BEFORE any modification
         lines = horizontal_lines_through_rect(page, rect) if preserve_lines else []
@@ -339,9 +300,7 @@ def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explici
         except Exception:
             pass
 
-        # 2. PDF redaction — strips images in zone (2) and line-art inside zone only (1)
-        # graphics=1 = remove only graphics FULLY covered by the redaction rect (not page-wide)
-        # graphics=3 would remove ALL graphics on the entire page — do NOT use
+        # 2. PDF redaction — images in zone (2), line-art inside zone only (1)
         try:
             page.add_redact_annot(rect, fill=rgb_01)
             page.apply_redactions(images=2, graphics=1)
@@ -349,10 +308,10 @@ def cover_header_logo(doc: "fitz.Document", color: Tuple[int, int, int], explici
             if verbose:
                 print(f"Page {i}: redaction failed ({exc}), using paint fallback")
 
-        # 3. White rect on top — catches anything redaction missed
+        # 3. White rect on top — belt-and-suspenders
         draw_cover_rect(page, rect, rgb_01)
 
-        # Restore any header separator lines that crossed the zone
+        # Restore any header separator lines that passed through the zone
         redraw_lines(page, lines, verbose=verbose)
         if verbose:
             print(f"Page {i}: logo zone cleared {rect}")
