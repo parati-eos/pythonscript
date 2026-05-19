@@ -23,6 +23,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from remove_footer import cover_footer, cover_header_logo, detect_footer_height
+from remove_background import find_grey_background_xrefs, blank_xobject
 from smartleads_clay import router as smartleads_router
 
 app = FastAPI(title="PDF Cleaner")
@@ -37,6 +38,8 @@ def _process_pdf(src: Path, dst: Path, footer_height: Optional[int] = None) -> N
     if height_pts > 0:
         cover_footer(doc, height_pts, color=(255, 255, 255))
     cover_header_logo(doc, color=(255, 255, 255))
+    for xref, name in find_grey_background_xrefs(doc).items():
+        blank_xobject(doc, xref, name)
     doc.save(str(dst), garbage=4, deflate=True)
     doc.close()
 
