@@ -106,6 +106,30 @@ def _fetch_linkedin_from_smartleads(lead_id: str) -> str:
         return ""
 
 
+# ── reply body helpers ───────────────────────────────────────────────────────
+
+def _extract_reply_text(html: str) -> str:
+    """Strip HTML and remove quoted thread, returning only the lead's reply text."""
+    # Cut at the quoted reply block (gmail_quote / blockquote)
+    for marker in ('class="gmail_quote', '<blockquote', 'class=3D"gmail_quote'):
+        idx = html.find(marker)
+        if idx != -1:
+            html = html[:idx]
+    # Remove all HTML tags
+    text = re.sub(r'<[^>]+>', '', html)
+    # Decode common HTML entities and non-breaking spaces
+    text = (text
+            .replace('&nbsp;', ' ')
+            .replace(' ', ' ')
+            .replace('&amp;', '&')
+            .replace('&lt;', '<')
+            .replace('&gt;', '>')
+            .replace('&quot;', '"'))
+    # Collapse whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
 # ── sheet helpers (synchronous — run in thread pool) ─────────────────────────
 
 def _get_sheet() -> gspread.Worksheet:
@@ -130,13 +154,15 @@ def _col_index(headers: list[str], *candidates: str) -> int | None:
 
 
 def _write_to_sheet(event_type: str, identifier: str, match_by: str,
-                    reply_col_name: str = "email_reply", seq_number: str | None = None) -> dict:
+                    reply_col_name: str = "email_reply", seq_number: str | None = None,
+                    reply_body: str | None = None) -> dict:
     """
     Find the matching row and increment the event column.
     match_by: "link"  → match identifier against LINK TO DEAL column (substring)
               "email" → match identifier against FOUND EMAIL column (exact)
     reply_col_name: column name fragment to use for reply events (default "email_reply")
     seq_number: email sequence step e.g. "1", "2" — used for LEAD STATUS value
+    reply_body: plain-text reply content; stored verbatim when reply_col_name != "email_reply"
     """
     ws = _get_sheet()
     all_values: list[list[str]] = ws.get_all_values()
@@ -215,12 +241,17 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     if target_col is not None:
         if col_label and target_col is None:
             return {"status": "error", "detail": f"Column '{col_label}' not found in sheet headers"}
-        current_raw = ws.cell(target_row, target_col).value or "0"
-        try:
-            new_val = int(current_raw) + 1
-        except ValueError:
-            new_val = 1
-        ws.update_cell(target_row, target_col, new_val)
+        # TrackB reply column: store the actual reply text, not a counter
+        if reply_body and reply_col_name != "email_reply" and ("reply" in evt or "replied" in evt):
+            ws.update_cell(target_row, target_col, reply_body)
+            new_val = reply_body
+        else:
+            current_raw = ws.cell(target_row, target_col).value or "0"
+            try:
+                new_val = int(current_raw) + 1
+            except ValueError:
+                new_val = 1
+            ws.update_cell(target_row, target_col, new_val)
 
     # Override LEAD STATUS with sequence label if available e.g. "Email 1"
     if seq_number:
@@ -282,8 +313,12 @@ async def _handle_smartleads_request(request: Request, reply_col_name: str = "em
         seq_raw = m.group(1) if m else None
     seq_number = str(seq_raw).strip() if seq_raw else None
 
-    log.warning("event_type='%s'  to_email='%s'  lead_id='%s'  seq='%s'",
-                event_type, to_email, lead_id, seq_number)
+    # Extract and clean reply body
+    raw_reply = payload.get("reply_body") or payload.get("reply_text") or ""
+    reply_body = _extract_reply_text(raw_reply) if raw_reply else None
+
+    log.warning("event_type='%s'  to_email='%s'  lead_id='%s'  seq='%s'  reply_len=%s",
+                event_type, to_email, lead_id, seq_number, len(reply_body) if reply_body else 0)
 
     api_key = os.getenv("SMARTLEADS_API_KEY", "")
     if api_key and lead_id:
@@ -292,7 +327,8 @@ async def _handle_smartleads_request(request: Request, reply_col_name: str = "em
         if deal_link:
             log.warning("STRATEGY: link-based match  deal_link='%s'", deal_link)
             result = await loop.run_in_executor(
-                _executor, _write_to_sheet, event_type, deal_link, "link", reply_col_name, seq_number
+                _executor, _write_to_sheet, event_type, deal_link, "link",
+                reply_col_name, seq_number, reply_body
             )
             return {"event_type": event_type, "deal_link": deal_link, **result}
 
@@ -302,7 +338,8 @@ async def _handle_smartleads_request(request: Request, reply_col_name: str = "em
     log.warning("STRATEGY: email-based match  to_email='%s'", to_email)
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
-        _executor, _write_to_sheet, event_type, to_email, "email", reply_col_name, seq_number
+        _executor, _write_to_sheet, event_type, to_email, "email",
+        reply_col_name, seq_number, reply_body
     )
     return {"event_type": event_type, "to_email": to_email, **result}
 
