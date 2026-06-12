@@ -113,11 +113,17 @@ def _get_sheet() -> gspread.Worksheet:
 
 
 def _col_index(headers: list[str], *candidates: str) -> int | None:
-    """Return 1-based column index matching any candidate substring (case-insensitive)."""
-    for i, h in enumerate(headers, start=1):
-        hl = h.lower().replace(" ", "_")
-        for c in candidates:
-            if c in hl:
+    """Return 1-based column index. Exact match wins; falls back to substring."""
+    normalized = [h.lower().replace(" ", "_") for h in headers]
+    # Pass 1: exact match
+    for c in candidates:
+        for i, hl in enumerate(normalized, start=1):
+            if hl == c:
+                return i
+    # Pass 2: substring match (candidate is contained in header)
+    for c in candidates:
+        for i, hl in enumerate(normalized, start=1):
+            if c in hl and not hl.startswith("trackb"):
                 return i
     return None
 
