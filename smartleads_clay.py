@@ -122,11 +122,12 @@ def _col_index(headers: list[str], *candidates: str) -> int | None:
     return None
 
 
-def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
+def _write_to_sheet(event_type: str, identifier: str, match_by: str, reply_col_name: str = "email_reply") -> dict:
     """
     Find the matching row and increment the event column.
     match_by: "link"  → match identifier against LINK TO DEAL column (substring)
               "email" → match identifier against FOUND EMAIL column (exact)
+    reply_col_name: column name fragment to use for reply events (default "email_reply")
     """
     ws = _get_sheet()
     all_values: list[list[str]] = ws.get_all_values()
@@ -138,7 +139,7 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
     log.warning("SHEET HEADERS: %s", headers)
 
     open_col      = _col_index(headers, "email_open")
-    reply_col     = _col_index(headers, "email_reply")
+    reply_col     = _col_index(headers, reply_col_name)
     clicked_col   = _col_index(headers, "link_click", "link_clicked", "email_link")
     status_col    = _col_index(headers, "lead_status", "lead status", "leadstatus")
     category_col  = _col_index(headers, "lead_category", "lead category", "lead_cat")
@@ -193,7 +194,7 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
     if "open" in evt:
         target_col, col_label = open_col, "Email_open"
     elif "reply" in evt or "replied" in evt:
-        target_col, col_label = reply_col, "Email_reply"
+        target_col, col_label = reply_col, reply_col_name
     elif "click" in evt:
         target_col, col_label = clicked_col, "Email_Link_clicked"
     elif "sent" in evt:
@@ -232,23 +233,16 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
     }
 
 
-# ── endpoint ──────────────────────────────────────────────────────────────────
+# ── shared request handler ────────────────────────────────────────────────────
 
-@router.post("/smartleads-inbound")
-async def receive_from_smartleads(request: Request):
-    """
-    Receives Smartleads event webhook.
-    If SMARTLEADS_API_KEY is set: fetches lead's linkedin_profile (LINK TO DEAL)
-    via API and matches by LINK TO DEAL column.
-    Otherwise: matches by to_email against FOUND EMAIL column.
-    """
+async def _handle_smartleads_request(request: Request, reply_col_name: str = "email_reply"):
     try:
         payload: Any = await request.json()
     except Exception:
         raw = await request.body()
         payload = raw.decode("utf-8", errors="replace")
 
-    log.warning("=== SMARTLEADS PAYLOAD RECEIVED ===")
+    log.warning("=== SMARTLEADS PAYLOAD RECEIVED (reply_col=%s) ===", reply_col_name)
     log.warning("RAW PAYLOAD: %s", json.dumps(payload, indent=2) if isinstance(payload, dict) else payload)
 
     if not isinstance(payload, dict):
@@ -260,30 +254,45 @@ async def receive_from_smartleads(request: Request):
         or payload.get("type")
         or ""
     )
-    to_email   = payload.get("to_email") or payload.get("to") or ""
-    lead_id    = str(payload.get("sl_email_lead_id") or "")
+    to_email = payload.get("to_email") or payload.get("to") or ""
+    lead_id  = str(payload.get("sl_email_lead_id") or "")
 
     log.warning("event_type='%s'  to_email='%s'  lead_id='%s'", event_type, to_email, lead_id)
 
-    # Decide matching strategy
     api_key = os.getenv("SMARTLEADS_API_KEY", "")
     if api_key and lead_id:
-        # Fetch linkedin_profile (= LINK TO DEAL) from Smartleads API
         loop = asyncio.get_event_loop()
         deal_link = await loop.run_in_executor(_executor, _fetch_linkedin_from_smartleads, lead_id)
         if deal_link:
             log.warning("STRATEGY: link-based match  deal_link='%s'", deal_link)
-            result = await loop.run_in_executor(_executor, _write_to_sheet, event_type, deal_link, "link")
+            result = await loop.run_in_executor(
+                _executor, _write_to_sheet, event_type, deal_link, "link", reply_col_name
+            )
             return {"event_type": event_type, "deal_link": deal_link, **result}
 
-    # Fallback: email-based match
     if not to_email:
         return {"status": "skipped", "reason": "no email or lead_id in payload"}
 
     log.warning("STRATEGY: email-based match  to_email='%s'", to_email)
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(_executor, _write_to_sheet, event_type, to_email, "email")
+    result = await loop.run_in_executor(
+        _executor, _write_to_sheet, event_type, to_email, "email", reply_col_name
+    )
     return {"event_type": event_type, "to_email": to_email, **result}
+
+
+# ── endpoints ─────────────────────────────────────────────────────────────────
+
+@router.post("/smartleads-inbound")
+async def receive_from_smartleads(request: Request):
+    """Standard webhook — reply events → Email_reply column."""
+    return await _handle_smartleads_request(request, reply_col_name="email_reply")
+
+
+@router.post("/smartleads-inbound-trackb")
+async def receive_from_smartleads_trackb(request: Request):
+    """TrackB duplicate — reply events → TrackB Email Reply column."""
+    return await _handle_smartleads_request(request, reply_col_name="trackb_email_reply")
 
 
 @router.get("/smartleads-inbound/health")
