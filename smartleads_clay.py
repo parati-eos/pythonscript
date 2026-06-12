@@ -31,6 +31,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -128,12 +129,14 @@ def _col_index(headers: list[str], *candidates: str) -> int | None:
     return None
 
 
-def _write_to_sheet(event_type: str, identifier: str, match_by: str, reply_col_name: str = "email_reply") -> dict:
+def _write_to_sheet(event_type: str, identifier: str, match_by: str,
+                    reply_col_name: str = "email_reply", seq_number: str | None = None) -> dict:
     """
     Find the matching row and increment the event column.
     match_by: "link"  → match identifier against LINK TO DEAL column (substring)
               "email" → match identifier against FOUND EMAIL column (exact)
     reply_col_name: column name fragment to use for reply events (default "email_reply")
+    seq_number: email sequence step e.g. "1", "2" — used for LEAD STATUS value
     """
     ws = _get_sheet()
     all_values: list[list[str]] = ws.get_all_values()
@@ -219,6 +222,10 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str, reply_col_n
             new_val = 1
         ws.update_cell(target_row, target_col, new_val)
 
+    # Override LEAD STATUS with sequence label if available e.g. "Email 1"
+    if seq_number:
+        lead_status = f"Email {seq_number}"
+
     # Update LEAD STATUS and LEAD CATEGORY columns
     if lead_status and status_col:
         ws.update_cell(target_row, status_col, lead_status)
@@ -263,7 +270,20 @@ async def _handle_smartleads_request(request: Request, reply_col_name: str = "em
     to_email = payload.get("to_email") or payload.get("to") or ""
     lead_id  = str(payload.get("sl_email_lead_id") or "")
 
-    log.warning("event_type='%s'  to_email='%s'  lead_id='%s'", event_type, to_email, lead_id)
+    # Extract email sequence step: try structured field first, then parse description
+    seq_raw = (
+        payload.get("seq_number")
+        or payload.get("sequence_number")
+        or payload.get("email_sequence_step")
+    )
+    if not seq_raw:
+        desc = payload.get("description", "")
+        m = re.search(r'[Ee]mail\s+(\d+)', desc)
+        seq_raw = m.group(1) if m else None
+    seq_number = str(seq_raw).strip() if seq_raw else None
+
+    log.warning("event_type='%s'  to_email='%s'  lead_id='%s'  seq='%s'",
+                event_type, to_email, lead_id, seq_number)
 
     api_key = os.getenv("SMARTLEADS_API_KEY", "")
     if api_key and lead_id:
@@ -272,7 +292,7 @@ async def _handle_smartleads_request(request: Request, reply_col_name: str = "em
         if deal_link:
             log.warning("STRATEGY: link-based match  deal_link='%s'", deal_link)
             result = await loop.run_in_executor(
-                _executor, _write_to_sheet, event_type, deal_link, "link", reply_col_name
+                _executor, _write_to_sheet, event_type, deal_link, "link", reply_col_name, seq_number
             )
             return {"event_type": event_type, "deal_link": deal_link, **result}
 
@@ -282,7 +302,7 @@ async def _handle_smartleads_request(request: Request, reply_col_name: str = "em
     log.warning("STRATEGY: email-based match  to_email='%s'", to_email)
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
-        _executor, _write_to_sheet, event_type, to_email, "email", reply_col_name
+        _executor, _write_to_sheet, event_type, to_email, "email", reply_col_name, seq_number
     )
     return {"event_type": event_type, "to_email": to_email, **result}
 
