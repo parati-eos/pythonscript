@@ -173,8 +173,9 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     headers = all_values[0]
     log.warning("SHEET HEADERS: %s", headers)
 
-    open_col      = _col_index(headers, "email_open")
-    reply_col     = _col_index(headers, reply_col_name)
+    open_col       = _col_index(headers, "email_open")
+    reply_col      = _col_index(headers, reply_col_name)
+    reply_text_col = _col_index(headers, "reply")   # "Reply" (AM) — stores reply body text
     clicked_col   = _col_index(headers, "link_click", "link_clicked", "email_link")
     status_col    = _col_index(headers, "lead_status", "lead status", "leadstatus")
     category_col  = _col_index(headers, "lead_category", "lead category", "lead_cat")
@@ -254,6 +255,12 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     # Override LEAD STATUS with sequence label if available e.g. "Email 1"
     if seq_number:
         lead_status = f"Email {seq_number}"
+
+    # Store reply body: TrackB column stores text instead of counter (handled above);
+    # for the regular webhook, also write to the "Reply" (AM) column if it exists
+    if reply_body and reply_text_col and ("reply" in evt_lower or "replied" in evt_lower):
+        ws.update_cell(target_row, reply_text_col, reply_body)
+        log.warning("REPLY TEXT saved to col %s at row %s", reply_text_col, target_row)
 
     # Update LEAD STATUS (LEAD CATEGORY left untouched — not auto-set)
     if lead_status and status_col:
