@@ -137,9 +137,11 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
     headers = all_values[0]
     log.warning("SHEET HEADERS: %s", headers)
 
-    open_col    = _col_index(headers, "email_open")
-    reply_col   = _col_index(headers, "email_reply")
-    clicked_col = _col_index(headers, "link_click", "link_clicked", "email_link")
+    open_col      = _col_index(headers, "email_open")
+    reply_col     = _col_index(headers, "email_reply")
+    clicked_col   = _col_index(headers, "link_click", "link_clicked", "email_link")
+    status_col    = _col_index(headers, "lead_status", "lead status", "leadstatus")
+    category_col  = _col_index(headers, "lead_category", "lead category", "lead_cat")
 
     if match_by == "link":
         key_col = _col_index(headers, "link_to_deal", "link to deal", "linktodeal")
@@ -148,8 +150,8 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
         key_col = _col_index(headers, "found_email", "found email", "foundemail", "email")
         col_label_key = "FOUND EMAIL"
 
-    log.warning("MATCH_BY=%s  key_col=%s  open=%s  reply=%s  clicked=%s",
-                match_by, key_col, open_col, reply_col, clicked_col)
+    log.warning("MATCH_BY=%s  key_col=%s  open=%s  reply=%s  clicked=%s  status=%s  category=%s",
+                match_by, key_col, open_col, reply_col, clicked_col, status_col, category_col)
 
     if key_col is None:
         return {"status": "error", "detail": f"Could not find '{col_label_key}' column in sheet"}
@@ -172,27 +174,51 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
         log.warning("NO ROW FOUND — match_by=%s  identifier='%s'", match_by, identifier)
         return {"status": "not_found", "match_by": match_by, "identifier": identifier}
 
-    # Map event type → column
-    evt = event_type.lower()
+    # Determine LEAD STATUS and LEAD CATEGORY from event type
+    _EVENT_MAP = [
+        # (keyword, lead_status, lead_category)
+        ("first",   "Email Sent",    "Cold"),
+        ("sent",    "Email Sent",    "Cold"),
+        ("open",    "Email Opened",  "Warm"),
+        ("click",   "Link Clicked",  "Interested"),
+        ("reply",   "Replied",       "Hot"),
+        ("replied", "Replied",       "Hot"),
+    ]
+    evt_lower = event_type.lower()
+    matched = next(((s, c) for k, s, c in _EVENT_MAP if k in evt_lower), (None, None))
+    lead_status, lead_category = matched
+
+    # Map event type → counter column (None for sent events — no counter column)
+    evt = evt_lower
     if "open" in evt:
         target_col, col_label = open_col, "Email_open"
     elif "reply" in evt or "replied" in evt:
         target_col, col_label = reply_col, "Email_reply"
     elif "click" in evt:
         target_col, col_label = clicked_col, "Email_Link_clicked"
+    elif "sent" in evt:
+        target_col, col_label = None, None   # sent: only update LEAD STATUS
     else:
         return {"status": "skipped", "reason": f"unhandled event type: {event_type}"}
 
-    if target_col is None:
-        return {"status": "error", "detail": f"Column '{col_label}' not found in sheet headers"}
+    new_val = None
+    if target_col is not None:
+        if col_label and target_col is None:
+            return {"status": "error", "detail": f"Column '{col_label}' not found in sheet headers"}
+        current_raw = ws.cell(target_row, target_col).value or "0"
+        try:
+            new_val = int(current_raw) + 1
+        except ValueError:
+            new_val = 1
+        ws.update_cell(target_row, target_col, new_val)
 
-    current_raw = ws.cell(target_row, target_col).value or "0"
-    try:
-        new_val = int(current_raw) + 1
-    except ValueError:
-        new_val = 1
-
-    ws.update_cell(target_row, target_col, new_val)
+    # Update LEAD STATUS and LEAD CATEGORY columns
+    if lead_status and status_col:
+        ws.update_cell(target_row, status_col, lead_status)
+        log.warning("LEAD STATUS set to '%s' at row %s", lead_status, target_row)
+    if lead_category and category_col:
+        ws.update_cell(target_row, category_col, lead_category)
+        log.warning("LEAD CATEGORY set to '%s' at row %s", lead_category, target_row)
 
     return {
         "status": "updated",
@@ -200,6 +226,8 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str) -> dict:
         "identifier": identifier,
         "column": col_label,
         "new_value": new_val,
+        "lead_status": lead_status,
+        "lead_category": lead_category,
         "row": target_row,
     }
 
