@@ -245,23 +245,18 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     if target_col is not None:
         if col_label and target_col is None:
             return {"status": "error", "detail": f"Column '{col_label}' not found in sheet headers"}
-        # TrackB reply column: store the actual reply text, not a counter
-        if reply_body and reply_col_name != "email_reply" and ("reply" in evt or "replied" in evt):
-            ws.update_cell(target_row, target_col, reply_body)
-            new_val = reply_body
-        else:
-            current_raw = ws.cell(target_row, target_col).value or "0"
-            try:
-                new_val = int(current_raw) + 1
-            except ValueError:
-                new_val = 1
-            ws.update_cell(target_row, target_col, new_val)
+        current_raw = ws.cell(target_row, target_col).value or "0"
+        try:
+            new_val = int(current_raw) + 1
+        except ValueError:
+            new_val = 1
+        ws.update_cell(target_row, target_col, new_val)
 
     # Override LEAD STATUS with sequence label if available e.g. "Email 1"
     if seq_number:
         lead_status = f"Email {seq_number}"
 
-    # Store reply body: TrackB column stores text instead of counter (handled above);
+    # Store reply body in the dedicated "Reply" (AM) column
     # for the regular webhook, also write to the "Reply" (AM) column if it exists
     if reply_body and reply_text_col and ("reply" in evt_lower or "replied" in evt_lower):
         ws.update_cell(target_row, reply_text_col, reply_body)
