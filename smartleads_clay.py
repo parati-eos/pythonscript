@@ -210,19 +210,17 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
         log.warning("NO ROW FOUND — match_by=%s  identifier='%s'", match_by, identifier)
         return {"status": "not_found", "match_by": match_by, "identifier": identifier}
 
-    # Determine LEAD STATUS and LEAD CATEGORY from event type
-    _EVENT_MAP = [
-        # (keyword, lead_status, lead_category)
-        ("first",   "Email Sent",    "Cold"),
-        ("sent",    "Email Sent",    "Cold"),
-        ("open",    "Email Opened",  "Warm"),
-        ("click",   "Link Clicked",  "Interested"),
-        ("reply",   "Replied",       "Hot"),
-        ("replied", "Replied",       "Hot"),
+    # Determine LEAD STATUS from event type (LEAD CATEGORY is not auto-set)
+    _STATUS_MAP = [
+        ("first",   "Email Sent"),
+        ("sent",    "Email Sent"),
+        ("open",    "Email Opened"),
+        ("click",   "Link Clicked"),
+        ("reply",   "Replied"),
+        ("replied", "Replied"),
     ]
     evt_lower = event_type.lower()
-    matched = next(((s, c) for k, s, c in _EVENT_MAP if k in evt_lower), (None, None))
-    lead_status, lead_category = matched
+    lead_status = next((s for k, s in _STATUS_MAP if k in evt_lower), None)
 
     # Map event type → counter column (None for sent events — no counter column)
     evt = evt_lower
@@ -257,13 +255,10 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     if seq_number:
         lead_status = f"Email {seq_number}"
 
-    # Update LEAD STATUS and LEAD CATEGORY columns
+    # Update LEAD STATUS (LEAD CATEGORY left untouched — not auto-set)
     if lead_status and status_col:
         ws.update_cell(target_row, status_col, lead_status)
         log.warning("LEAD STATUS set to '%s' at row %s", lead_status, target_row)
-    if lead_category and category_col:
-        ws.update_cell(target_row, category_col, lead_category)
-        log.warning("LEAD CATEGORY set to '%s' at row %s", lead_category, target_row)
 
     return {
         "status": "updated",
@@ -272,7 +267,6 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
         "column": col_label,
         "new_value": new_val,
         "lead_status": lead_status,
-        "lead_category": lead_category,
         "row": target_row,
     }
 
