@@ -109,24 +109,29 @@ def _fetch_linkedin_from_smartleads(lead_id: str) -> str:
 # ── reply body helpers ───────────────────────────────────────────────────────
 
 def _extract_reply_text(html: str) -> str:
-    """Strip HTML and remove quoted thread, returning only the lead's reply text."""
-    # Cut at the quoted reply block (gmail_quote / blockquote)
-    for marker in ('class="gmail_quote', '<blockquote', 'class=3D"gmail_quote'):
+    """Return only the sender's reply — strip HTML tags, quoted thread, and whitespace."""
+    # Cut everything from the quoted thread onwards (also trim the wrapping <div>)
+    for marker in ('class="gmail_quote', "class='gmail_quote", '<blockquote', 'class=3D"gmail_quote'):
         idx = html.find(marker)
         if idx != -1:
-            html = html[:idx]
+            # Also cut the enclosing <div> immediately before the quote block
+            pre = html[:idx].rfind('<div')
+            html = html[:pre] if pre != -1 else html[:idx]
     # Remove all HTML tags
     text = re.sub(r'<[^>]+>', '', html)
-    # Decode common HTML entities and non-breaking spaces
+    # Decode HTML entities and all forms of non-breaking space
     text = (text
             .replace('&nbsp;', ' ')
+            .replace(' ', ' ')
+            .replace('&#160;', ' ')
             .replace(' ', ' ')
             .replace('&amp;', '&')
             .replace('&lt;', '<')
             .replace('&gt;', '>')
             .replace('&quot;', '"'))
-    # Collapse whitespace
-    text = re.sub(r'\s+', ' ', text).strip()
+    # Collapse all whitespace into single spaces
+    text = re.sub(r'[\s ]+', ' ', text).strip()
+    log.warning("REPLY EXTRACTED: '%s'", text[:120])
     return text
 
 
