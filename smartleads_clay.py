@@ -256,9 +256,9 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     if seq_number:
         lead_status = f"Email {seq_number}"
 
-    # Store reply body in the dedicated "Reply" (AM) column
-    # for the regular webhook, also write to the "Reply" (AM) column if it exists
-    if reply_body and reply_text_col and ("reply" in evt_lower or "replied" in evt_lower):
+    # Store reply body in "Reply" (AM) only for the 1st webhook (email_reply counter column)
+    is_reply_evt = "reply" in evt_lower or "replied" in evt_lower
+    if reply_body and reply_text_col and is_reply_evt and reply_col_name == "email_reply":
         ws.update_cell(target_row, reply_text_col, reply_body)
         log.warning("REPLY TEXT saved to col %s at row %s", reply_text_col, target_row)
 
