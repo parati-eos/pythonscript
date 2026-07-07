@@ -178,10 +178,15 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     headers = all_values[0]
     log.warning("SHEET HEADERS: %s", headers)
 
+    # Map each counter column → its corresponding text column for reply body
+    _REPLY_TEXT_COL = {
+        "email_reply":          "reply",               # 1st webhook → Reply (AM)
+        "trackb_number_reply":  "trackb_email_reply",  # 2nd webhook → TrackB Email Reply (AH)
+    }
     open_col       = _col_index(headers, "email_open")
     reply_col      = _col_index(headers, reply_col_name)
-    reply_text_col = _col_index(headers, "reply")   # "Reply" (AM) — stores reply body text
-    clicked_col   = _col_index(headers, "link_click", "link_clicked", "email_link")
+    reply_text_col = _col_index(headers, _REPLY_TEXT_COL.get(reply_col_name, ""))
+    clicked_col    = _col_index(headers, "link_click", "link_clicked", "email_link")
     status_col    = _col_index(headers, "lead_status", "lead status", "leadstatus")
     category_col  = _col_index(headers, "lead_category", "lead category", "lead_cat")
 
@@ -256,9 +261,9 @@ def _write_to_sheet(event_type: str, identifier: str, match_by: str,
     if seq_number:
         lead_status = f"Email {seq_number}"
 
-    # Store reply body in "Reply" (AM) only for the 1st webhook (email_reply counter column)
+    # Store reply body in the mapped text column (Reply AM for 1st, TrackB Email Reply AH for 2nd)
     is_reply_evt = "reply" in evt_lower or "replied" in evt_lower
-    if reply_body and reply_text_col and is_reply_evt and reply_col_name == "email_reply":
+    if reply_body and reply_text_col and is_reply_evt:
         ws.update_cell(target_row, reply_text_col, reply_body)
         log.warning("REPLY TEXT saved to col %s at row %s", reply_text_col, target_row)
 
@@ -355,8 +360,8 @@ async def receive_from_smartleads(request: Request):
 
 @router.post("/smartleads-inbound-trackb")
 async def receive_from_smartleads_trackb(request: Request):
-    """TrackB duplicate — reply events → TrackB Email Reply column."""
-    return await _handle_smartleads_request(request, reply_col_name="trackb_email_reply")
+    """TrackB webhook — counter → TrackB number Reply (AN), text → TrackB Email Reply (AH)."""
+    return await _handle_smartleads_request(request, reply_col_name="trackb_number_reply")
 
 
 @router.get("/smartleads-inbound/health")
