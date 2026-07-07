@@ -360,7 +360,13 @@ async def receive_from_smartleads(request: Request):
 
 @router.post("/smartleads-inbound-trackb")
 async def receive_from_smartleads_trackb(request: Request):
-    """TrackB webhook — counter → TrackB number Reply (AN), text → TrackB Email Reply (AH)."""
+    """TrackB webhook — reply events → TrackB Email Reply counter (AH)."""
+    return await _handle_smartleads_request(request, reply_col_name="trackb_email_reply")
+
+
+@router.post("/smartleads-inbound-trackb2")
+async def receive_from_smartleads_trackb2(request: Request):
+    """TrackB2 webhook — counter → TrackB number Reply (AN), text → TrackB Email Reply (AH)."""
     return await _handle_smartleads_request(request, reply_col_name="trackb_number_reply")
 
 
